@@ -15,10 +15,11 @@ export default async function TeacherAttendanceSelection() {
 
     if (!teacher) return <div>Teacher profile not found.</div>;
 
-    // Get unique sections assigned to this teacher
-    const assignedSections = await db.selectDistinct({
-        id: sections.id,
-        name: sections.name,
+    // Get unique section+subject combinations assigned to this teacher
+    const assignedClasses = await db.selectDistinct({
+        sectionId: sections.id,
+        sectionName: sections.name,
+        subject: timetable.subject,
     })
         .from(timetable)
         .where(eq(timetable.teacherId, teacher.id))
@@ -31,25 +32,28 @@ export default async function TeacherAttendanceSelection() {
                 <p className="text-slate-500 mt-1">Select a class to start recording attendance logs.</p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {assignedSections.map((section) => (
-                    <div key={section.id} className="group relative">
-                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:shadow-purple-100 transition-all hover:-translate-y-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                {assignedClasses.map((cls, idx) => (
+                    <div key={`${cls.sectionId}-${cls.subject}-${idx}`} className="group relative">
+                        <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:shadow-purple-100 transition-all hover:-translate-y-1">
                             <div className="flex justify-between items-start mb-8">
                                 <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-colors duration-300">
                                     <Landmark size={24} />
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Section ID</p>
-                                    <p className="text-xs font-bold text-slate-900 mt-1 uppercase tracking-tighter">{section.id?.substring(0, 8)}</p>
+                                    <p className="text-xs font-bold text-slate-900 mt-1 uppercase tracking-tighter">{cls.sectionId?.substring(0, 8)}</p>
                                 </div>
                             </div>
 
-                            <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-2">{section.name || 'Unknown Section'}</h3>
+                            <div className="mb-2">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{cls.subject || 'No Subject'}</p>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">{cls.sectionName || 'Unknown Section'}</h3>
+                            </div>
                             <p className="text-sm text-slate-400 font-medium mb-8">Ready for today's roll call session.</p>
 
                             <Link
-                                href={`/teacher/attendance/${section.id}`}
+                                href={`/teacher/attendance/${cls.sectionId}?subject=${encodeURIComponent(cls.subject || '')}`}
                                 className="flex items-center justify-between w-full bg-slate-900 text-white p-5 rounded-2xl hover:bg-purple-600 transition-all group-hover:shadow-xl group-hover:shadow-purple-200"
                             >
                                 <span className="flex items-center gap-3 font-bold text-sm">
@@ -62,7 +66,7 @@ export default async function TeacherAttendanceSelection() {
                     </div>
                 ))}
 
-                {assignedSections.length === 0 && (
+                {assignedClasses.length === 0 && (
                     <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-slate-200">
                         <div className="flex flex-col items-center gap-4 text-slate-300">
                             <Users size={64} strokeWidth={1} />

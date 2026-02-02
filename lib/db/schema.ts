@@ -25,6 +25,7 @@ export const students = sqliteTable('students', {
   year: text('year'),
   phone: text('phone'),
   sectionId: text('section_id').references(() => sections.id, { onDelete: 'set null' }),
+  attendancePercentage: integer('attendance_percentage').default(0),
 });
 
 export const sections = sqliteTable('sections', {
@@ -49,5 +50,18 @@ export const attendance = sqliteTable('attendance', {
   teacherId: text('teacher_id').notNull().references(() => teachers.id, { onDelete: 'cascade' }),
   date: text('date').notNull(), // YYYY-MM-DD
   status: text('status', { enum: ['present', 'absent', 'late'] }).notNull(),
+  subject: text('subject'), // Assigned subject for this record
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const subjectStats = sqliteTable('subject_stats', {
+  id: text('id').primaryKey(),
+  studentId: text('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+  subject: text('subject').notNull(),
+  presentCount: integer('present_count').default(0),
+  lateCount: integer('late_count').default(0),
+  absentCount: integer('absent_count').default(0),
+  totalSessions: integer('total_sessions').default(0),
+  percentage: integer('percentage').default(0),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });

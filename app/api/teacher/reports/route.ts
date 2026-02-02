@@ -21,11 +21,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const sectionId = searchParams.get('sectionId');
     const date = searchParams.get('date');
+    const subject = searchParams.get('subject');
 
     let query = db.select({
         id: attendance.id,
         date: attendance.date,
         status: attendance.status,
+        subject: attendance.subject, // Added subject to selection
         studentName: students.name,
         sectionName: sections.name,
     })
@@ -35,8 +37,11 @@ export async function GET(request: Request) {
         .where(eq(attendance.teacherId, teacher.id));
 
     const filters = [];
-    if (sectionId) filters.push(eq(attendance.sectionId, sectionId));
-    if (date) filters.push(eq(attendance.date, date));
+    if (sectionId && sectionId !== '') filters.push(eq(attendance.sectionId, sectionId));
+    if (date && date !== '') filters.push(eq(attendance.date, date));
+    if (subject && subject !== '') {
+        filters.push(sql`LOWER(${attendance.subject}) LIKE LOWER(${'%' + subject + '%'})`);
+    }
 
     if (filters.length > 0) {
         // @ts-ignore

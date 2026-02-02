@@ -1,0 +1,86 @@
+{
+  "sections": [
+    {
+      "id": "r1a9duk2i",
+      "name": "MCA"
+    },
+    {
+      "id": "0u26aeq6r",
+      "name": "MCA B 2024-26"
+    },
+    {
+      "id": "k2vllxb8h",
+      "name": "MCA A"
+    },
+    {
+      "id": "bazp2t33f",
+      "name": "MCA B"
+    }
+  ],
+  "studentColumns": [
+    {
+      "cid": 0,
+      "name": "id",
+      "type": "TEXT",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 1
+    },
+    {
+      "cid": 1,
+      "name": "name",
+      "type": "TEXT",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 2,
+      "name": "email",
+      "type": "TEXT",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 3,
+      "name": "section_id",
+      "type": "TEXT",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 4,
+      "name": "usn",
+      "type": "TEXT",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 5,
+      "name": "batch",
+      "type": "TEXT",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 6,
+      "name": "year",
+      "type": "TEXT",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 7,
+      "name": "phone",
+      "type": "TEXT",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    }
+  ]
+}

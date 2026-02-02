@@ -8,6 +8,13 @@
       "when": 1770012899627,
       "tag": "0000_luxuriant_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1770019459063,
+      "tag": "0001_classy_valeria_richards",
+      "breakpoints": true
     }
   ]
 }

@@ -29,8 +29,8 @@ export default async function TeacherDashboard() {
 
     if (!teacher) return <div>Teacher profile not found.</div>;
 
-    // Assigned sections and classes
-    const assignedClasses = await db.select({
+    // Assigned sections and classes (unique combinations)
+    const assignedClasses = await db.selectDistinct({
         sectionId: sections.id,
         sectionName: sections.name,
         subject: timetable.subject,
@@ -39,7 +39,8 @@ export default async function TeacherDashboard() {
     })
         .from(timetable)
         .where(eq(timetable.teacherId, teacher.id))
-        .leftJoin(sections, eq(timetable.sectionId, sections.id));
+        .leftJoin(sections, eq(timetable.sectionId, sections.id))
+        .groupBy(sections.id, sections.name, timetable.subject);
 
     // Attendance Stats for this teacher
     const statsResult = await db.select({
@@ -76,12 +77,12 @@ export default async function TeacherDashboard() {
 
     return (
         <div className="space-y-8 max-w-7xl mx-auto animate-in fade-in duration-700">
-            <header className="flex justify-between items-end">
+            <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Teacher Console</h1>
                     <p className="text-slate-500 mt-1">Ready to manage your academic sessions, <span className="text-indigo-600 font-bold">{session.user.name}</span>?</p>
                 </div>
-                <div className="bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between md:justify-end gap-4 w-full md:w-auto">
                     <div className="text-right">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Profile Status</p>
                         <p className="text-sm font-bold text-emerald-500 flex items-center gap-1 justify-end mt-1">
@@ -93,7 +94,7 @@ export default async function TeacherDashboard() {
             </header>
 
             {/* Attendance Analytics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:shadow-indigo-100/50">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">My Attendance Rate</p>
                     <div className="flex items-center justify-between">
@@ -231,7 +232,7 @@ export default async function TeacherDashboard() {
                             {assignedClasses.map((cls, i) => (
                                 <Link
                                     key={i}
-                                    href={`/teacher/attendance/${cls.sectionId}`}
+                                    href={`/teacher/attendance/${cls.sectionId}?subject=${encodeURIComponent(cls.subject || '')}`}
                                     className="p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-indigo-600 hover:text-white transition-all group relative overflow-hidden"
                                 >
                                     <div className="relative z-10">

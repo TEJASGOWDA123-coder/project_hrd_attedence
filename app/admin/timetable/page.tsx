@@ -22,16 +22,21 @@ export default function TimetablePage() {
 
     const fetchData = async () => {
         setLoading(true);
-        const [tRes, secRes, teaRes] = await Promise.all([
-            fetch('/api/admin/timetable'),
-            fetch('/api/admin/sections'),
-            fetch('/api/admin/teachers'),
-        ]);
-        const [tData, secData, teaData] = await Promise.all([tRes.json(), secRes.json(), teaRes.json()]);
-        setTimetable(tData);
-        setSections(secData);
-        setTeachers(teaData);
-        setLoading(false);
+        try {
+            const [tRes, secRes, teaRes] = await Promise.all([
+                fetch('/api/admin/timetable'),
+                fetch('/api/admin/sections'),
+                fetch('/api/admin/teachers'),
+            ]);
+            const [tData, secData, teaData] = await Promise.all([tRes.json(), secRes.json(), teaRes.json()]);
+            setTimetable(tData || []);
+            setSections(secData || []);
+            setTeachers(teaData || []);
+        } catch (err) {
+            console.error('Failed to fetch data:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -54,23 +59,31 @@ export default function TimetablePage() {
         setSubmitting(false);
     };
 
+    const handleDelete = async (id: string, subject: string) => {
+        if (confirm(`Remove ${subject} from the schedule?`)) {
+            const res = await fetch(`/api/admin/timetable?id=${id}`, { method: 'DELETE' });
+            if (res.ok) fetchData();
+        }
+    };
+
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            <header className="flex justify-between items-end">
+        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-10">
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 sm:gap-0">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Academic Timetable</h1>
-                    <p className="text-slate-500 mt-1">Schedule management and class assignments.</p>
+                    <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Academic Timetable</h1>
+                    <p className="text-slate-500 mt-1 text-sm">Schedule management and class assignments.</p>
                 </div>
                 <button
                     onClick={() => setShowModal(true)}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                    className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
                 >
                     <Plus size={20} /> Create Schedule
                 </button>
             </header>
 
-            <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                <div className="overflow-x-auto">
+            <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                {/* Desktop Table View (Hidden on mobile) */}
+                <div className="hidden lg:block">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-slate-50">
@@ -92,7 +105,7 @@ export default function TimetablePage() {
                                 </tr>
                             ) : timetable.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-8 py-20 text-center text-slate-400 italic">No entries scheduled yet.</td>
+                                    <td colSpan={4} className="px-8 py-20 text-center text-slate-400 italic font-medium">No entries scheduled yet.</td>
                                 </tr>
                             ) : timetable.map((entry) => (
                                 <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -112,8 +125,8 @@ export default function TimetablePage() {
                                     </td>
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
-                                                <img src={`https://ui-avatars.com/api/?name=${entry.teacherName}&background=4f46e5&color=fff&size=24`} alt="" />
+                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                                                <img src={`https://ui-avatars.com/api/?name=${entry.teacherName}&background=4f46e5&color=fff&size=32`} alt="" />
                                             </div>
                                             <span className="text-xs font-bold text-slate-600">{entry.teacherName}</span>
                                         </div>
@@ -131,22 +144,80 @@ export default function TimetablePage() {
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-right">
-                                        <button className="p-2 text-slate-300 hover:text-slate-600 transition-colors"><ChevronRight size={18} /></button>
+                                        <div className="flex justify-end gap-2  group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => handleDelete(entry.id, entry.subject)}
+                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                title="Delete Schedule"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Mobile / Tablet Card View */}
+                <div className="lg:hidden divide-y divide-slate-100">
+                    {loading ? (
+                        <div className="p-12 text-center">
+                            <Loader2 className="animate-spin text-indigo-600 mx-auto" size={32} />
+                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-4">Loading Schedule...</p>
+                        </div>
+                    ) : timetable.length === 0 ? (
+                        <div className="p-12 text-center text-slate-400 italic text-sm font-medium">No entries scheduled yet.</div>
+                    ) : timetable.map((entry) => (
+                        <div key={entry.id} className="p-6 space-y-4">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 font-black text-xs border border-indigo-100 uppercase shrink-0">
+                                        {entry.sectionName?.substring(0, 2) || '??'}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-black text-slate-900 leading-tight">{entry.subject}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">{entry.sectionName}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleDelete(entry.id, entry.subject)}
+                                    className="p-2 text-rose-500 bg-rose-50 rounded-xl active:bg-rose-100 transition-colors"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-2">
+                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                    <Calendar size={14} className="text-emerald-500" />
+                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{entry.day}</span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                    <Clock size={14} className="text-slate-400" />
+                                    <span className="text-[10px] font-bold text-slate-500 tracking-tighter truncate">{entry.startTime} — {entry.endTime}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 border-t border-slate-50 pt-3">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                    <img src={`https://ui-avatars.com/api/?name=${entry.teacherName}&background=4f46e5&color=fff&size=24`} alt="" />
+                                </div>
+                                <span className="text-xs font-bold text-slate-600 truncate">{entry.teacherName} (Assigned Staff)</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {showModal && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-6 z-[60] animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
-                        <div className="p-10">
-                            <div className="flex justify-between items-start mb-8">
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 md:p-6 z-[60] animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 md:p-10">
+                            <div className="flex justify-between items-start mb-6 md:mb-8">
                                 <div>
-                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Create Schedule</h2>
+                                    <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Create Schedule</h2>
                                     <p className="text-slate-400 text-sm font-medium mt-1">Define mandatory subject hours and teacher links.</p>
                                 </div>
                                 <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
@@ -154,8 +225,8 @@ export default function TimetablePage() {
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6">
-                                <div className="space-y-1.5 col-span-2">
+                            <form onSubmit={handleSubmit} className="flex flex-col md:grid md:grid-cols-2 gap-4 md:gap-6">
+                                <div className="space-y-1.5 md:col-span-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Educational Subject</label>
                                     <div className="relative group">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-colors">
@@ -164,7 +235,7 @@ export default function TimetablePage() {
                                         <input
                                             required
                                             placeholder="e.g. Advanced Calculus"
-                                            className="w-full pl-11 pr-4 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-300"
+                                            className="w-full pl-11 pr-4 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-300"
                                             value={formData.subject}
                                             onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                                         />
@@ -174,7 +245,8 @@ export default function TimetablePage() {
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Target Section</label>
                                     <select
-                                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
+                                        required
+                                        className="w-full px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
                                         value={formData.sectionId}
                                         onChange={(e) => setFormData({ ...formData, sectionId: e.target.value })}
                                     >
@@ -186,7 +258,8 @@ export default function TimetablePage() {
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Assigned Teacher</label>
                                     <select
-                                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
+                                        required
+                                        className="w-full px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
                                         value={formData.teacherId}
                                         onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
                                     >
@@ -198,7 +271,8 @@ export default function TimetablePage() {
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Academic Day</label>
                                     <select
-                                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
+                                        required
+                                        className="w-full px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
                                         value={formData.dayOfWeek}
                                         onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
                                     >
@@ -210,32 +284,34 @@ export default function TimetablePage() {
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Time Slot (Start - End)</label>
                                     <div className="flex gap-2">
                                         <input
+                                            required
                                             type="time"
-                                            className="flex-1 px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                                            className="flex-1 px-4 md:px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
                                             value={formData.startTime}
                                             onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                                         />
                                         <input
+                                            required
                                             type="time"
-                                            className="flex-1 px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                                            className="flex-1 px-4 md:px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
                                             value={formData.endTime}
                                             onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                                         />
                                     </div>
                                 </div>
 
-                                <div className="col-span-2 flex gap-4 mt-6">
+                                <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 mt-6">
                                     <button
                                         type="button"
                                         onClick={() => setShowModal(false)}
-                                        className="flex-1 py-4 text-slate-400 font-bold text-sm hover:bg-slate-50 rounded-2xl transition"
+                                        className="order-2 sm:order-1 flex-1 py-4 text-slate-400 font-bold text-sm hover:bg-slate-50 rounded-2xl transition"
                                     >
                                         Discard
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={submitting}
-                                        className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+                                        className="order-1 sm:order-2 flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all flex items-center justify-center gap-2"
                                     >
                                         {submitting ? <Loader2 className="animate-spin" size={20} /> : "Finalize Schedule Entry"}
                                     </button>

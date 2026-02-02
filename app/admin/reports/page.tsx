@@ -8,7 +8,7 @@ export default function ReportsPage() {
     const [reports, setReports] = useState<any[]>([]);
     const [sections, setSections] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [filter, setFilter] = useState({ sectionId: '', date: '' });
+    const [filter, setFilter] = useState({ sectionId: '', date: '', subject: '' });
 
     const fetchSections = async () => {
         const res = await fetch('/api/admin/sections');
@@ -18,10 +18,15 @@ export default function ReportsPage() {
 
     const fetchReports = async () => {
         setLoading(true);
-        const query = new URLSearchParams(filter as any).toString();
-        const res = await fetch(`/api/admin/reports?${query}`);
+        // Build query params, excluding empty values
+        const params = new URLSearchParams();
+        if (filter.sectionId) params.append('sectionId', filter.sectionId);
+        if (filter.date) params.append('date', filter.date);
+        if (filter.subject) params.append('subject', filter.subject);
+
+        const res = await fetch(`/api/admin/reports?${params.toString()}`);
         const data = await res.json();
-        setReports(data);
+        setReports(Array.isArray(data) ? data : []);
         setLoading(false);
     };
 
@@ -32,14 +37,16 @@ export default function ReportsPage() {
     const handleDownload = () => {
         if (reports.length === 0) return;
 
-        const headers = ["Student Name", "Section", "Date", "Status"];
+        const headers = ["Student Name", "Section", "Subject", "Date", "Status", "Overall Attendance %"];
         const csvContent = [
             headers.join(","),
             ...reports.map(r => [
                 `"${r.studentName}"`,
                 `"${r.sectionName}"`,
+                `"${r.subject || 'N/A'}"`,
                 `"${r.date}"`,
-                `"${r.status}"`
+                `"${r.status}"`,
+                `"${r.attendancePercentage ?? '0'}%"`
             ].join(","))
         ].join("\n");
 
@@ -56,22 +63,27 @@ export default function ReportsPage() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <header className="flex justify-between items-end">
+
+            <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Audit & Reports</h1>
-                    <p className="text-slate-500 mt-1">Detailed attendance logs and academic analysis.</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <p className="text-slate-500">Detailed attendance logs and academic analysis.</p>
+                        <span className="px-2 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap">3 Late = 1 Absent</span>
+                    </div>
                 </div>
                 <button
                     onClick={handleDownload}
                     disabled={reports.length === 0}
-                    className="bg-white text-slate-900 px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-slate-50 border border-slate-200 shadow-sm transition-all active:scale-95 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full md:w-auto bg-white text-slate-900 px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-50 border border-slate-200 shadow-sm transition-all active:scale-95 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Download size={18} /> Export Intelligence
                 </button>
             </header>
 
-            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-100/50 flex flex-wrap gap-8 items-end">
-                <div className="flex-1 min-w-[240px] space-y-1.5">
+
+            <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-100/50 flex flex-col md:flex-row flex-wrap gap-4 md:gap-8 items-end">
+                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Target Section</label>
                     <div className="relative">
                         <select
@@ -84,7 +96,7 @@ export default function ReportsPage() {
                         </select>
                     </div>
                 </div>
-                <div className="flex-1 min-w-[240px] space-y-1.5">
+                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Reporting Date</label>
                     <input
                         type="date"
@@ -93,9 +105,19 @@ export default function ReportsPage() {
                         onChange={(e) => setFilter({ ...filter, date: e.target.value })}
                     />
                 </div>
+                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Subject Filter</label>
+                    <input
+                        type="text"
+                        placeholder="e.g., Mathematics"
+                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                        value={filter.subject}
+                        onChange={(e) => setFilter({ ...filter, subject: e.target.value })}
+                    />
+                </div>
                 <button
                     onClick={fetchReports}
-                    className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2 group h-[58px]"
+                    className="w-full md:w-auto bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 group h-[58px]"
                 >
                     <Filter size={18} className="group-hover:rotate-12 transition-transform" />
                     Generate Report
@@ -104,7 +126,7 @@ export default function ReportsPage() {
 
             {/* Admin Intelligence Summary */}
             {!loading && reports.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 animate-in zoom-in-95 duration-500">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 animate-in zoom-in-95 duration-500">
                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm border-l-4 border-l-indigo-500">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Audit Trail Size</p>
                         <p className="text-2xl font-black text-slate-900">{reports.length}</p>
@@ -131,6 +153,8 @@ export default function ReportsPage() {
                             <tr className="border-b border-slate-50">
                                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student Profile</th>
                                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Section</th>
+                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Subject</th>
+                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Overall Performance</th>
                                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timestamp</th>
                                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Final Status</th>
                             </tr>
@@ -138,7 +162,7 @@ export default function ReportsPage() {
                         <tbody className="divide-y divide-slate-50">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={4} className="px-8 py-20 text-center">
+                                    <td colSpan={6} className="px-8 py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <Loader2 className="animate-spin text-indigo-600" size={32} />
                                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Compiling Attendance Data...</p>
@@ -147,7 +171,7 @@ export default function ReportsPage() {
                                 </tr>
                             ) : reports.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-8 py-20 text-center">
+                                    <td colSpan={6} className="px-8 py-20 text-center">
                                         <div className="flex flex-col items-center gap-3 text-slate-300">
                                             <ShieldCheck size={48} strokeWidth={1} />
                                             <p className="text-sm font-bold uppercase tracking-widest">No matching logs found</p>
@@ -168,6 +192,32 @@ export default function ReportsPage() {
                                         <div className="flex items-center gap-2 py-1 px-3 bg-indigo-50 rounded-lg w-fit border border-indigo-100 text-indigo-700">
                                             <Landmark size={14} />
                                             <span className="text-[10px] font-black uppercase tracking-tight">{report.sectionName}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center gap-2 py-1 px-3 bg-purple-50 rounded-lg w-fit border border-purple-100 text-purple-700">
+                                            <span className="text-[10px] font-black uppercase tracking-tight">{report.subject || 'N/A'}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex flex-col items-start gap-1">
+                                            <div className={cn(
+                                                "px-2 py-0.5 rounded-full text-[9px] font-black tracking-tighter",
+                                                (report.attendancePercentage ?? 0) < 75 ? "bg-rose-50 text-rose-600 border border-rose-100" :
+                                                    (report.attendancePercentage ?? 0) < 85 ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                                                        "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                            )}>
+                                                {report.attendancePercentage ?? 0}%
+                                            </div>
+                                            <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={cn(
+                                                        "h-full transition-all duration-500",
+                                                        (report.attendancePercentage ?? 0) < 75 ? "bg-rose-500" : (report.attendancePercentage ?? 0) < 85 ? "bg-amber-500" : "bg-emerald-500"
+                                                    )}
+                                                    style={{ width: `${report.attendancePercentage ?? 0}%` }}
+                                                />
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="px-8 py-5">

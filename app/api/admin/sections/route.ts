@@ -4,16 +4,28 @@ import { eq, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-    const data = await db.select({
-        id: sections.id,
-        name: sections.name,
-        studentCount: sql<number>`count(${students.id})`.mapWith(Number),
-    })
-        .from(sections)
-        .leftJoin(students, eq(sections.id, students.sectionId))
-        .groupBy(sections.id, sections.name);
+    try {
+        const data = await db.select({
+            id: sections.id,
+            name: sections.name,
+            studentCount: sql<number>`count(${students.id})`.mapWith(Number),
+        })
+            .from(sections)
+            .leftJoin(students, eq(sections.id, students.sectionId))
+            .groupBy(sections.id, sections.name);
 
-    return NextResponse.json(data);
+        console.log('Sections fetched successfully:', data.length, 'sections');
+        return NextResponse.json(data);
+    } catch (err: any) {
+        console.error('Error fetching sections:', err);
+        console.error('Error stack:', err.stack);
+        console.error('Error details:', {
+            message: err.message,
+            code: err.code,
+            name: err.name
+        });
+        return NextResponse.json({ error: 'Failed to fetch sections', details: err.message }, { status: 500 });
+    }
 }
 
 export async function POST(request: Request) {

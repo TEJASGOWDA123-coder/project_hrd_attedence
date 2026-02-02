@@ -32,3 +32,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: err.message }, { status: 400 });
     }
 }
+
+export async function DELETE(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+
+    try {
+        await db.delete(timetable).where(eq(timetable.id, id));
+        return NextResponse.json({ success: true });
+    } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+}
+

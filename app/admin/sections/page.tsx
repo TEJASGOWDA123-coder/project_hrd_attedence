@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, LayoutGrid, X, Loader2, Hash } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Plus, Trash2, LayoutGrid, Loader2, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SectionsPage() {
+    const router = useRouter();
     const [sections, setSections] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -13,11 +15,26 @@ export default function SectionsPage() {
 
     const fetchSections = async () => {
         setLoading(true);
-        const res = await fetch('/api/admin/sections');
-        const data = await res.json();
-        setSections(data);
-        setLoading(false);
+        try {
+            const res = await fetch('/api/admin/sections');
+            const data = await res.json();
+
+            // Ensure data is an array before setting state
+            if (Array.isArray(data)) {
+                setSections(data);
+            } else {
+                console.error('API returned non-array data:', data);
+                setSections([]);
+            }
+        } catch (err) {
+            console.error('Failed to fetch sections:', err);
+            setSections([]);
+        } finally {
+            setLoading(false);
+        }
     };
+
+
 
     useEffect(() => {
         fetchSections();
@@ -39,7 +56,8 @@ export default function SectionsPage() {
         setSubmitting(false);
     };
 
-    const handleDelete = async (id: string, sectionName: string) => {
+    const handleDelete = async (e: React.MouseEvent, id: string, sectionName: string) => {
+        e.stopPropagation();
         if (confirm(`Permanentely delete ${sectionName}? This will affect all associated data.`)) {
             await fetch(`/api/admin/sections?id=${id}`, { method: 'DELETE' });
             fetchSections();
@@ -48,20 +66,20 @@ export default function SectionsPage() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <header className="flex justify-between items-end">
+            <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Sections & Classes</h1>
                     <p className="text-slate-500 mt-1">Organize your institution's academic structure.</p>
                 </div>
                 <button
                     onClick={() => setShowModal(true)}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                    className="w-full md:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
                 >
                     <Plus size={20} /> New Section
                 </button>
             </header>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                 {loading ? (
                     <div className="col-span-full py-20 flex flex-col items-center gap-4 bg-white rounded-[2rem] border border-slate-200">
                         <Loader2 className="animate-spin text-indigo-600" size={32} />
@@ -72,7 +90,7 @@ export default function SectionsPage() {
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No sections defined yet.</p>
                     </div>
                 ) : sections.map((section) => (
-                    <div key={section.id} className="group relative">
+                    <div key={section.id} className="group relative cursor-pointer" onClick={() => router.push(`/admin/sections/${section.id}/roster`)}>
                         <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm transition-all group-hover:shadow-2xl group-hover:shadow-indigo-100/50 group-hover:border-indigo-100 group-hover:-translate-y-1">
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-4">
@@ -88,7 +106,7 @@ export default function SectionsPage() {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => handleDelete(section.id, section.name)}
+                                    onClick={(e) => handleDelete(e, section.id, section.name)}
                                     className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
                                     title="Delete Section"
                                 >
@@ -111,6 +129,7 @@ export default function SectionsPage() {
                 ))}
             </div>
 
+            {/* Individual Enrollment Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-6 z-[60] animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
@@ -157,6 +176,7 @@ export default function SectionsPage() {
                     </div>
                 </div>
             )}
+
         </div>
     );
 }

@@ -21,14 +21,28 @@ export default function StudentsPage() {
 
     const fetchData = async () => {
         setLoading(true);
-        const [sRes, secRes] = await Promise.all([
-            fetch('/api/admin/students'),
-            fetch('/api/admin/sections'),
-        ]);
-        const [sData, secData] = await Promise.all([sRes.json(), secRes.json()]);
-        setStudents(sData);
-        setSections(secData);
-        setLoading(false);
+        try {
+            const [sRes, secRes] = await Promise.all([
+                fetch('/api/admin/students'),
+                fetch('/api/admin/sections'),
+            ]);
+
+            if (!sRes.ok || !secRes.ok) {
+                const sErr = !sRes.ok ? await sRes.text() : null;
+                const secErr = !secRes.ok ? await secRes.text() : null;
+                console.error('Fetch error:', { sStatus: sRes.status, sErr, secStatus: secRes.status, secErr });
+                throw new Error('Failed to fetch data from server');
+            }
+
+            const [sData, secData] = await Promise.all([sRes.json(), secRes.json()]);
+            setStudents(Array.isArray(sData) ? sData : []);
+            setSections(Array.isArray(secData) ? secData : []);
+        } catch (err: any) {
+            console.error('Data sync failed:', err);
+            alert('Could not synchronize student records. Please check your connection or database status.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -107,13 +121,18 @@ export default function StudentsPage() {
         const emailIdx = headers.indexOf('email');
 
         if (usnIdx === -1 || nameIdx === -1 || emailIdx === -1 || sectionIdx === -1) {
-            setBulkErrors(['Invalid CSV headers. Required: usn, name, batch, section, year, number, email']);
+            const missing = [];
+            if (usnIdx === -1) missing.push('usn');
+            if (nameIdx === -1) missing.push('name');
+            if (emailIdx === -1) missing.push('email');
+            if (sectionIdx === -1) missing.push('section');
+            setBulkErrors([`Invalid CSV headers. Missing: ${missing.join(', ')}. Required: usn, name, batch, section, year, number, email`]);
             return;
         }
 
         const parsed: any[] = [];
         const errors: string[] = [];
-        const sectionNames = new Set(sections.map(s => s.name.toLowerCase()));
+        const availableSections = sections.map(s => s.name);
 
         lines.slice(1).forEach((line, i) => {
             const cols = line.split(',').map(c => c.trim());
@@ -121,19 +140,46 @@ export default function StudentsPage() {
             const name = cols[nameIdx];
             const email = cols[emailIdx];
             const batch = batchIdx !== -1 ? cols[batchIdx] : '';
-            const sectionName = cols[sectionIdx];
+            const sectionValue = cols[sectionIdx];
             const year = yearIdx !== -1 ? cols[yearIdx] : '';
             const phone = numberIdx !== -1 ? cols[numberIdx] : '';
 
-            if (!usn || !name || !email || !sectionName) {
+            if (!usn || !name || !email || !sectionValue) {
                 errors.push(`Row ${i + 2}: Missing required fields (USN, Name, Email, or Section).`);
             } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                 errors.push(`Row ${i + 2}: Invalid email format (${email}).`);
-            } else if (!sectionNames.has(sectionName.toLowerCase())) {
-                errors.push(`Row ${i + 2}: Section "${sectionName}" not found in system.`);
-            }
+            } else {
+                // Fuzzy/Prefix Matching Logic
+                const normalizedSearch = sectionValue.toLowerCase();
 
-            parsed.push({ usn, name, email, batch, sectionName, year, phone });
+                // 1. Exact match
+                let matchedSection = sections.find(s => s.name.toLowerCase() === normalizedSearch);
+
+                // 2. Prefix match (if unique)
+                if (!matchedSection) {
+                    const matches = sections.filter(s => s.name.toLowerCase().startsWith(normalizedSearch));
+                    if (matches.length === 1) {
+                        matchedSection = matches[0];
+                    } else if (matches.length > 1) {
+                        errors.push(`Row ${i + 2}: Section "${sectionValue}" is ambiguous. Did you mean: ${matches.map(m => m.name).join(', ')}?`);
+                        return;
+                    }
+                }
+
+                if (!matchedSection) {
+                    errors.push(`Row ${i + 2}: Section "${sectionValue}" not found. Available: ${availableSections.join(', ')}`);
+                } else {
+                    parsed.push({
+                        usn,
+                        name,
+                        email,
+                        batch,
+                        sectionName: matchedSection.name, // Use the actual DB name
+                        year,
+                        phone
+                    });
+                }
+            }
         });
 
         setBulkData(parsed);

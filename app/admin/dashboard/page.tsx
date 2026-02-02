@@ -124,7 +124,7 @@ export default async function AdminDashboard() {
                 {statsCards.map((card) => {
                     const Icon = card.icon;
                     return (
-                        <div key={card.label} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:shadow-indigo-100/30 group">
+                        <div key={card.label} className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:shadow-indigo-100/30 group">
                             <div className="flex justify-between items-start mb-6">
                                 <div className={cn(
                                     "p-4 rounded-2xl",
@@ -148,7 +148,7 @@ export default async function AdminDashboard() {
             {/* Attendance Intelligence Section */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-slate-200 relative overflow-hidden group">
+                    <div className="bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] text-white shadow-2xl shadow-slate-200 relative overflow-hidden group">
                         <div className="absolute -bottom-10 -right-10 opacity-10 group-hover:scale-125 transition-transform duration-700">
                             <TrendingUp size={200} />
                         </div>
@@ -177,7 +177,7 @@ export default async function AdminDashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 flex flex-col justify-between group cursor-pointer hover:bg-indigo-700 transition">
+                    <div className="bg-indigo-600 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 flex flex-col justify-between group cursor-pointer hover:bg-indigo-700 transition">
                         <div>
                             <AlertTriangle size={32} className="mb-4 text-indigo-300" />
                             <h4 className="text-xl font-black leading-tight">Institutional Performance Audit</h4>
@@ -188,22 +188,22 @@ export default async function AdminDashboard() {
                     </div>
                 </div>
 
-                <div className="lg:col-span-3 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10">
-                    <div className="flex justify-between items-center mb-10">
+                <div className="lg:col-span-3 bg-white rounded-3xl md:rounded-[2.5rem] border border-slate-200 shadow-sm p-6 md:p-10">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                         <div>
                             <h3 className="text-xl font-black text-slate-900 tracking-tight">Institutional Trends</h3>
                             <p className="text-sm text-slate-400 font-medium mt-1">Attendance velocity over the last 7 active reporting days.</p>
                         </div>
                     </div>
 
-                    <div className="h-64 relative bg-slate-50 rounded-3xl border border-dashed border-slate-200 flex items-end justify-center p-8 gap-4 overflow-hidden">
+                    <div className="h-64 relative bg-slate-50 rounded-3xl border border-dashed border-slate-200 flex items-end justify-center p-4 md:p-8 gap-2 md:gap-4 overflow-hidden">
                         {stats.dailyTrends.length > 0 ? stats.dailyTrends.map((t, i) => {
                             const height = (t.present / (t.total || 1)) * 100;
                             return (
                                 <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
                                     <div className="w-full relative flex items-end justify-center group">
                                         <div
-                                            className="w-full max-w-[40px] bg-indigo-500 rounded-t-xl transition-all duration-1000 group-hover:bg-indigo-600 shadow-lg shadow-indigo-100"
+                                            className="w-full max-w-[30px] md:max-w-[40px] bg-indigo-500 rounded-t-xl transition-all duration-1000 group-hover:bg-indigo-600 shadow-lg shadow-indigo-100"
                                             style={{ height: `${Math.max(10, height)}%` }}
                                         />
                                         <div className="absolute -top-8 bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
@@ -221,7 +221,7 @@ export default async function AdminDashboard() {
                         )}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-6 mt-10">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
                         <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
                             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Peak Load</p>
                             <p className="text-lg font-black text-indigo-900 mt-1">{stats.peakLoadCount} Logs</p>
@@ -240,7 +240,7 @@ export default async function AdminDashboard() {
 
             {/* Bottom Activity Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10">
+                <div className="bg-white rounded-3xl md:rounded-[2.5rem] border border-slate-200 shadow-sm p-6 md:p-10">
                     <div className="flex justify-between items-center mb-8">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-slate-900 text-white rounded-xl">
@@ -287,7 +287,7 @@ export default async function AdminDashboard() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10 flex flex-col justify-center text-center group">
+                <div className="bg-white rounded-3xl md:rounded-[2.5rem] border border-slate-200 shadow-sm p-6 md:p-10 flex flex-col justify-center text-center group">
                     <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-600 mx-auto mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
                         <LayoutGrid size={40} />
                     </div>

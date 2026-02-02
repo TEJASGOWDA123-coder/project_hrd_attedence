@@ -1,0 +1,506 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Search, Users, Mail, GraduationCap, X, Loader2, Landmark, FileUp, Download, AlertCircle, CheckCircle2, IdCard, Hash, Phone } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+export default function StudentsPage() {
+    const [students, setStudents] = useState<any[]>([]);
+    const [sections, setSections] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [showModal, setShowModal] = useState(false);
+    const [showBulkModal, setShowBulkModal] = useState(false);
+    const [formData, setFormData] = useState({ usn: '', name: '', email: '', batch: '', year: '', phone: '', sectionId: '' });
+    const [submitting, setSubmitting] = useState(false);
+
+    // Bulk States
+    const [bulkData, setBulkData] = useState<any[]>([]);
+    const [bulkErrors, setBulkErrors] = useState<string[]>([]);
+    const [bulkPhase, setBulkPhase] = useState<'upload' | 'preview' | 'success'>('upload');
+
+    const fetchData = async () => {
+        setLoading(true);
+        const [sRes, secRes] = await Promise.all([
+            fetch('/api/admin/students'),
+            fetch('/api/admin/sections'),
+        ]);
+        const [sData, secData] = await Promise.all([sRes.json(), secRes.json()]);
+        setStudents(sData);
+        setSections(secData);
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitting(true);
+        const res = await fetch('/api/admin/students', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData),
+        });
+        if (res.ok) {
+            setShowModal(false);
+            setFormData({ usn: '', name: '', email: '', batch: '', year: '', phone: '', sectionId: '' });
+            fetchData();
+        } else {
+            const err = await res.json();
+            alert(err.error || 'Enrollment failed');
+        }
+        setSubmitting(false);
+    };
+
+    const handleBulkSubmit = async () => {
+        if (bulkErrors.length > 0) return;
+        setSubmitting(true);
+        try {
+            const res = await fetch('/api/admin/students/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ students: bulkData }),
+            });
+            if (res.ok) {
+                setBulkPhase('success');
+                fetchData();
+            } else {
+                const error = await res.json();
+                alert(error.error || 'Bulk enrollment failed');
+            }
+        } catch (err) {
+            alert('An error occurred during bulk enrollment');
+        }
+        setSubmitting(false);
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target?.result as string;
+            parseCSV(text);
+        };
+        reader.readAsText(file);
+    };
+
+    const parseCSV = (text: string) => {
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+            setBulkErrors(['CSV file is empty or missing data rows.']);
+            return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+        // Match user's requested fields: usn name batch section year number email
+        const usnIdx = headers.indexOf('usn');
+        const nameIdx = headers.indexOf('name');
+        const batchIdx = headers.indexOf('batch');
+        const sectionIdx = headers.indexOf('section');
+        const yearIdx = headers.indexOf('year');
+        const numberIdx = headers.indexOf('number'); // maps to phone
+        const emailIdx = headers.indexOf('email');
+
+        if (usnIdx === -1 || nameIdx === -1 || emailIdx === -1 || sectionIdx === -1) {
+            setBulkErrors(['Invalid CSV headers. Required: usn, name, batch, section, year, number, email']);
+            return;
+        }
+
+        const parsed: any[] = [];
+        const errors: string[] = [];
+        const sectionNames = new Set(sections.map(s => s.name.toLowerCase()));
+
+        lines.slice(1).forEach((line, i) => {
+            const cols = line.split(',').map(c => c.trim());
+            const usn = cols[usnIdx];
+            const name = cols[nameIdx];
+            const email = cols[emailIdx];
+            const batch = batchIdx !== -1 ? cols[batchIdx] : '';
+            const sectionName = cols[sectionIdx];
+            const year = yearIdx !== -1 ? cols[yearIdx] : '';
+            const phone = numberIdx !== -1 ? cols[numberIdx] : '';
+
+            if (!usn || !name || !email || !sectionName) {
+                errors.push(`Row ${i + 2}: Missing required fields (USN, Name, Email, or Section).`);
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                errors.push(`Row ${i + 2}: Invalid email format (${email}).`);
+            } else if (!sectionNames.has(sectionName.toLowerCase())) {
+                errors.push(`Row ${i + 2}: Section "${sectionName}" not found in system.`);
+            }
+
+            parsed.push({ usn, name, email, batch, sectionName, year, phone });
+        });
+
+        setBulkData(parsed);
+        setBulkErrors(errors);
+        setBulkPhase('preview');
+    };
+
+    const downloadSample = () => {
+        // Headers: usn,name,batch,section,year,number,email
+        const csvContent = "data:text/csv;charset=utf-8,usn,name,batch,section,year,number,email\n1RV22MC001,Venk,2024-2026,MCA A,1,9886655443,venky@gmail.com\n1RV22MC002,Tejas,2024-2026,MCA A,1,9886655444,tejas@gmail.com";
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "student_bulk_template.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleDelete = async (id: string, name: string) => {
+        if (confirm(`Unenroll ${name}? All attendance data for this student will be archived.`)) {
+            await fetch(`/api/admin/students?id=${id}`, { method: 'DELETE' });
+            fetchData();
+        }
+    };
+
+    const filteredStudents = students.filter(s =>
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
+        s.email.toLowerCase().includes(search.toLowerCase()) ||
+        s.usn.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <header className="flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Student Roster</h1>
+                    <p className="text-slate-500 mt-1">Enrollment and academic tracking portal.</p>
+                </div>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => {
+                            setBulkPhase('upload');
+                            setBulkErrors([]);
+                            setBulkData([]);
+                            setShowBulkModal(true);
+                        }}
+                        className="bg-white text-slate-600 px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-slate-50 border border-slate-200 shadow-sm transition-all active:scale-95 font-bold text-sm"
+                    >
+                        <FileUp size={20} /> Bulk Enrollment
+                    </button>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                    >
+                        <Plus size={20} /> New Enrollment
+                    </button>
+                </div>
+            </header>
+
+            <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search by name, USN, or email..."
+                            className="pl-12 pr-4 py-3 w-full bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+                        Active Students: {students.length}
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-slate-50">
+                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student Info</th>
+                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Acedemic Details</th>
+                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact</th>
+                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Settings</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={4} className="px-8 py-20 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Loader2 className="animate-spin text-indigo-600" size={32} />
+                                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Accessing records...</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filteredStudents.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="px-8 py-1 – text-center">
+                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest py-20">No matching enrollments found.</p>
+                                    </td>
+                                </tr>
+                            ) : filteredStudents.map((student) => (
+                                <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-full border-2 border-indigo-100 p-0.5 group-hover:border-indigo-600 transition-colors overflow-hidden">
+                                                <img src={`https://ui-avatars.com/api/?name=${student.name}&background=f1f5f9&color=6366f1`} alt="" className="rounded-full" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-slate-900 leading-tight">{student.name}</p>
+                                                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-tighter mt-0.5">{student.usn}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-2 py-1 px-3 bg-indigo-50 rounded-lg w-fit text-indigo-700 border border-indigo-100">
+                                                <Landmark size={12} />
+                                                <span className="text-[10px] font-black uppercase tracking-tight">{student.sectionName || 'Pending'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-slate-400">
+                                                <span className="text-[10px] font-black uppercase tracking-widest">{student.batch || 'No Batch'}</span>
+                                                <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Year {student.year || 'N/A'}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2 text-slate-600">
+                                                <Mail size={12} className="text-slate-400" />
+                                                <span className="text-xs font-bold">{student.email}</span>
+                                            </div>
+                                            {student.phone && (
+                                                <div className="flex items-center gap-2 text-slate-400">
+                                                    <Phone size={12} />
+                                                    <span className="text-[10px] font-medium">{student.phone}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5 text-right">
+                                        <button
+                                            onClick={() => handleDelete(student.id, student.name)}
+                                            className="p-2.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all active:scale-90"
+                                            title="Unenroll Student"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Individual Enrollment Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-6 z-[60] animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
+                        <div className="p-10">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">New Enrollment</h2>
+                                    <p className="text-slate-400 text-sm font-medium mt-1">Register a new student to the institution.</p>
+                                </div>
+                                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Student USN</label>
+                                        <div className="relative">
+                                            <IdCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                            <input required placeholder="1RV22MC000" className="w-full pl-12 pr-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.usn} onChange={(e) => setFormData({ ...formData, usn: e.target.value })} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Full Name</label>
+                                        <input required placeholder="Charlie Morningstar" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Email</label>
+                                        <input required type="email" placeholder="charlie@student.ams.edu" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Phone Number</label>
+                                        <input placeholder="9886655443" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Batch</label>
+                                        <input placeholder="2024-2026" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.batch} onChange={(e) => setFormData({ ...formData, batch: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Year</label>
+                                        <input placeholder="1" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.year} onChange={(e) => setFormData({ ...formData, year: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Section</label>
+                                        <select className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 cursor-pointer appearance-none" value={formData.sectionId} onChange={(e) => setFormData({ ...formData, sectionId: e.target.value })}>
+                                            <option value="">Select...</option>
+                                            {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-6">
+                                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-slate-400 font-bold text-sm hover:bg-slate-50 rounded-2xl transition">Discard</button>
+                                    <button type="submit" disabled={submitting} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+                                        {submitting ? <Loader2 className="animate-spin" size={20} /> : "Finalize Enrollment"}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk Enrollment Modal */}
+            {showBulkModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-6 z-[60] animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
+                        <div className="p-10">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Bulk Enrollment Flow</h2>
+                                    <p className="text-slate-400 text-sm font-medium mt-1">Institutional scale enrollment via CSV data processing.</p>
+                                </div>
+                                <button onClick={() => setShowBulkModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            {bulkPhase === 'upload' && (
+                                <div className="space-y-8">
+                                    <div className="border-4 border-dashed border-slate-100 rounded-[2.5rem] p-16 text-center hover:border-indigo-100 transition-colors group relative">
+                                        <input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                        <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-50">
+                                            <FileUp size={40} />
+                                        </div>
+                                        <h4 className="text-xl font-black text-slate-900">Push CSV Source</h4>
+                                        <p className="text-slate-400 text-sm mt-1 font-medium">Click or drag your enrollment data sheet here.</p>
+                                        <div className="mt-4 flex flex-wrap justify-center gap-2">
+                                            {['USN', 'Name', 'Batch', 'Section', 'Year', 'Number', 'Email'].map(field => (
+                                                <span key={field} className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest">{field}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50 p-8 rounded-3xl flex items-center justify-between border border-slate-100">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm text-indigo-600">
+                                                <Download size={24} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-slate-900">Standard Data Structure</p>
+                                                <p className="text-xs text-slate-400 font-medium">Download the optimized template for zero-error import.</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={downloadSample} className="px-6 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                                            Get Source Template
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {bulkPhase === 'preview' && (
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                                                <Users size={20} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-lg font-black text-slate-900">Log Preview</h4>
+                                                <p className="text-xs text-slate-400 font-medium">Analyzing {bulkData.length} entry points...</p>
+                                            </div>
+                                        </div>
+                                        {bulkErrors.length > 0 && (
+                                            <div className="flex items-center gap-2 text-rose-500 bg-rose-50 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-tight border border-rose-100 animate-pulse">
+                                                <AlertCircle size={16} /> {bulkErrors.length} Conflict(s)
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="max-h-80 overflow-y-auto border border-slate-100 rounded-[2rem] shadow-inner bg-slate-50/50">
+                                        <table className="w-full text-xs border-collapse">
+                                            <thead className="bg-white sticky top-0 border-b border-slate-100 z-10">
+                                                <tr>
+                                                    <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">USN</th>
+                                                    <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">Student</th>
+                                                    <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">Academic</th>
+                                                    <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">Contact</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {bulkData.slice(0, 50).map((row, i) => (
+                                                    <tr key={i} className="bg-white hover:bg-indigo-50/30 transition-colors">
+                                                        <td className="px-6 py-3 font-black text-slate-900">{row.usn}</td>
+                                                        <td className="px-6 py-3 font-bold text-slate-700">{row.name}</td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className="font-black text-indigo-600 uppercase tracking-tighter">{row.sectionName}</span>
+                                                                <span className="text-[10px] text-slate-400 font-medium">{row.batch}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3 space-y-0.5">
+                                                            <p className="text-slate-500">{row.email}</p>
+                                                            <p className="text-[10px] text-slate-400">{row.phone}</p>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {bulkErrors.length > 0 && (
+                                        <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100 text-xs font-medium text-rose-600 space-y-2">
+                                            <p className="font-black uppercase tracking-widest mb-3 flex items-center gap-2"><AlertCircle size={16} /> Critical Issues Detected:</p>
+                                            <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                                                {bulkErrors.slice(0, 8).map((err, i) => (
+                                                    <p key={i}>• {err}</p>
+                                                ))}
+                                            </div>
+                                            {bulkErrors.length > 8 && <p className="mt-2 font-bold italic underline">And {bulkErrors.length - 8} more issues that require fixing.</p>}
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-4 mt-8">
+                                        <button onClick={() => setBulkPhase('upload')} className="flex-1 py-4 text-slate-400 font-bold text-sm hover:bg-slate-50 rounded-2xl transition">Back to Upload</button>
+                                        <button disabled={bulkErrors.length > 0 || submitting} onClick={handleBulkSubmit} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                                            {submitting ? <Loader2 className="animate-spin" size={20} /> : "Authorize System Entry"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {bulkPhase === 'success' && (
+                                <div className="text-center py-16 space-y-8 animate-in zoom-in-95 duration-700">
+                                    <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-50 border border-emerald-100">
+                                        <CheckCircle2 size={48} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-3xl font-black text-slate-900 tracking-tight">Authorization Successful</h3>
+                                        <p className="text-slate-400 text-sm mt-3 font-medium max-w-sm mx-auto">The institutional roster has been updated with the processed student data packets.</p>
+                                    </div>
+                                    <button onClick={() => setShowBulkModal(false)} className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black text-sm hover:bg-indigo-600 transition-all shadow-2xl shadow-slate-200">
+                                        Return to Secure Roster
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

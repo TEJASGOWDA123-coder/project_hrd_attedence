@@ -52,10 +52,16 @@ export default function TeachersPage() {
         }
     };
 
-    const filteredTeachers = teachers.filter(t =>
-        t.name.toLowerCase().includes(search.toLowerCase()) ||
-        t.email.toLowerCase().includes(search.toLowerCase())
-    );
+    const [selectedSpecialization, setSelectedSpecialization] = useState('');
+
+    const specializations = Array.from(new Set(teachers.map(t => t.specialization).filter(Boolean)));
+
+    const filteredTeachers = teachers.filter(t => {
+        const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase()) ||
+            t.email.toLowerCase().includes(search.toLowerCase());
+        const matchesSpec = selectedSpecialization ? t.specialization === selectedSpecialization : true;
+        return matchesSearch && matchesSpec;
+    });
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -73,19 +79,30 @@ export default function TeachersPage() {
             </header>
 
             <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Filter by name, email or ID..."
-                            className="pl-12 pr-4 py-3 w-full bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30 gap-4">
+                    <div className="flex-1 flex gap-4 max-w-2xl">
+                         <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Filter by name, email or ID..."
+                                className="pl-12 pr-4 py-3 w-full bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                         <select
+                            className="px-4 py-3 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 cursor-pointer appearance-none min-w-[200px]"
+                            value={selectedSpecialization}
+                            onChange={(e) => setSelectedSpecialization(e.target.value)}
+                        >
+                            <option value="">All Specializations</option>
+                            {specializations.map(spec => <option key={spec} value={spec}>{spec}</option>)}
+                        </select>
                     </div>
+                   
                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
-                        Total Staff: {teachers.length}
+                        Total Staff: {filteredTeachers.length}
                     </div>
                 </div>
 

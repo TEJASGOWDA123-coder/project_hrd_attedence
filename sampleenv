@@ -9,3 +9,7 @@ AUTH_SECRET="your-super-secret-key-123456789"
 
 # Environment
 NODE_ENV="development"
+# VAPID Keys for Web Push
+NEXT_PUBLIC_VAPID_PUBLIC_KEY="BPMxqxpzBGuf92b-V9I5MoQV_bjPaf0ailegEpW7t8o0VXuEMJVE3YB7sUH-x6r5jJXp_27JMAF1ACJXWelT0bs"
+VAPID_PRIVATE_KEY="M00XDJlc8gTtUyZuD3uGMQaH_OomzKAmZjxgmWsoYMI"
+VAPID_SUBJECT="mailto:admin@example.com"

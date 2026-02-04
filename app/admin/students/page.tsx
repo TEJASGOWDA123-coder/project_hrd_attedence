@@ -206,11 +206,15 @@ export default function StudentsPage() {
         }
     };
 
-    const filteredStudents = students.filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.email.toLowerCase().includes(search.toLowerCase()) ||
-        s.usn.toLowerCase().includes(search.toLowerCase())
-    );
+    const [selectedSection, setSelectedSection] = useState('');
+
+    const filteredStudents = students.filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
+            s.email.toLowerCase().includes(search.toLowerCase()) ||
+            s.usn.toLowerCase().includes(search.toLowerCase());
+        const matchesSection = selectedSection ? s.sectionId === selectedSection : true;
+        return matchesSearch && matchesSection;
+    });
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -241,19 +245,30 @@ export default function StudentsPage() {
             </header>
 
             <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search by name, USN, or email..."
-                            className="pl-12 pr-4 py-3 w-full bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30 gap-4">
+                    <div className="flex-1 flex gap-4 max-w-2xl">
+                         <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search by name, USN, or email..."
+                                className="pl-12 pr-4 py-3 w-full bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <select
+                            className="px-4 py-3 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 cursor-pointer appearance-none min-w-[200px]"
+                            value={selectedSection}
+                            onChange={(e) => setSelectedSection(e.target.value)}
+                        >
+                            <option value="">All Sections</option>
+                            {sections.map(s => <option key={s.id} value={s.id}>{s.name || s.id}</option>)}
+                        </select>
                     </div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
-                        Active Students: {students.length}
+                   
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm whitespace-nowrap">
+                        Active Students: {filteredStudents.length}
                     </div>
                 </div>
 

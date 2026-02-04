@@ -10,15 +10,20 @@ export default function TimetablePage() {
     const [teachers, setTeachers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [schedType, setSchedType] = useState<'weekly' | 'date'>('weekly');
     const [formData, setFormData] = useState({
         sectionId: '',
         teacherId: '',
         subject: '',
         dayOfWeek: 'Monday',
+        date: '',
         startTime: '09:00',
         endTime: '10:00'
     });
     const [submitting, setSubmitting] = useState(false);
+    const [showTodayOnly, setShowTodayOnly] = useState(false);
+    const [filterTeacher, setFilterTeacher] = useState('');
+    const [filterSection, setFilterSection] = useState('');
 
     const fetchData = async () => {
         setLoading(true);
@@ -46,14 +51,22 @@ export default function TimetablePage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
+        const payload = {
+            ...formData,
+            // If schedType is 'date', we might want to supply date and ignore dayOfWeek (or derive it)
+            // If schedType is 'weekly', date should be empty
+            date: schedType === 'date' ? formData.date : null,
+            dayOfWeek: schedType === 'date' ? new Date(formData.date).toLocaleDateString('en-US', { weekday: 'long' }) : formData.dayOfWeek
+        };
+
         const res = await fetch('/api/admin/timetable', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData),
+            body: JSON.stringify(payload),
         });
         if (res.ok) {
             setShowModal(false);
-            setFormData({ sectionId: '', teacherId: '', subject: '', dayOfWeek: 'Monday', startTime: '09:00', endTime: '10:00' });
+            setFormData({ sectionId: '', teacherId: '', subject: '', dayOfWeek: 'Monday', date: '', startTime: '09:00', endTime: '10:00' });
             fetchData();
         }
         setSubmitting(false);
@@ -66,6 +79,34 @@ export default function TimetablePage() {
         }
     };
 
+    const getFilteredTimetable = () => {
+        let filtered = timetable;
+
+        // Apply Today Only filter
+        if (showTodayOnly) {
+            const now = new Date();
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const todayName = days[now.getDay()];
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            filtered = filtered.filter(entry => entry.day === todayName && entry.endTime > currentTime);
+        }
+
+        // Apply Teacher Filter
+        if (filterTeacher) {
+            filtered = filtered.filter(entry => entry.teacherId === filterTeacher);
+        }
+
+        // Apply Section Filter
+        if (filterSection) {
+            filtered = filtered.filter(entry => entry.sectionId === filterSection);
+        }
+
+        return filtered;
+    };
+
+    const filteredTimetable = getFilteredTimetable();
+
     return (
         <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-10">
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 sm:gap-0">
@@ -73,12 +114,44 @@ export default function TimetablePage() {
                     <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Academic Timetable</h1>
                     <p className="text-slate-500 mt-1 text-sm">Schedule management and class assignments.</p>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
-                >
-                    <Plus size={20} /> Create Schedule
-                </button>
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <select
+                        className="px-3 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none text-xs font-bold text-slate-600 cursor-pointer"
+                        value={filterSection}
+                        onChange={(e) => setFilterSection(e.target.value)}
+                    >
+                        <option value="">All Classes</option>
+                        {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+
+                    <select
+                        className="px-3 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none text-xs font-bold text-slate-600 cursor-pointer"
+                        value={filterTeacher}
+                        onChange={(e) => setFilterTeacher(e.target.value)}
+                    >
+                        <option value="">All Teachers</option>
+                        {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+
+                     <button
+                        onClick={() => setShowTodayOnly(!showTodayOnly)}
+                        className={cn(
+                            "px-4 py-3 rounded-2xl flex items-center justify-center gap-2 border transition-all font-bold text-sm",
+                            showTodayOnly 
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                        )}
+                    >
+                        <Calendar size={18} />
+                        {showTodayOnly ? 'Active Today' : 'Show All'}
+                    </button>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                    >
+                        <Plus size={20} /> Create
+                    </button>
+                </div>
             </header>
 
             <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
@@ -103,11 +176,13 @@ export default function TimetablePage() {
                                         </div>
                                     </td>
                                 </tr>
-                            ) : timetable.length === 0 ? (
+                            ) : filteredTimetable.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-8 py-20 text-center text-slate-400 italic font-medium">No entries scheduled yet.</td>
+                                    <td colSpan={4} className="px-8 py-20 text-center text-slate-400 italic font-medium">
+                                         {showTodayOnly ? "No active classes for today." : "No entries scheduled yet."}
+                                    </td>
                                 </tr>
-                            ) : timetable.map((entry) => (
+                            ) : filteredTimetable.map((entry) => (
                                 <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors group">
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-4">
@@ -268,17 +343,56 @@ export default function TimetablePage() {
                                     </select>
                                 </div>
 
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Academic Day</label>
-                                    <select
-                                        required
-                                        className="w-full px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
-                                        value={formData.dayOfWeek}
-                                        onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
-                                    >
-                                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => <option key={d} value={d}>{d}</option>)}
-                                    </select>
+                                <div className="space-y-1.5 md:col-span-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Schedule Type</label>
+                                    <div className="flex bg-slate-100 p-1 rounded-2xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSchedType('weekly')}
+                                            className={cn(
+                                                "flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                                                schedType === 'weekly' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                            )}
+                                        >
+                                            Weekly Recurring
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSchedType('date')}
+                                            className={cn(
+                                                "flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                                                schedType === 'date' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                            )}
+                                        >
+                                            Specific Date
+                                        </button>
+                                    </div>
                                 </div>
+
+                                {schedType === 'weekly' ? (
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">recurrence Day</label>
+                                        <select
+                                            required
+                                            className="w-full px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
+                                            value={formData.dayOfWeek}
+                                            onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
+                                        >
+                                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => <option key={d} value={d}>{d}</option>)}
+                                        </select>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">One-time Date</label>
+                                        <input
+                                            required
+                                            type="date"
+                                            className="w-full px-5 py-3.5 md:py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                                            value={formData.date}
+                                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Time Slot (Start - End)</label>

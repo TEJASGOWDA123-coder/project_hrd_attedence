@@ -1,0 +1,58 @@
+import { db } from '@/lib/db';
+import { qrCodes, attendance, students } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const code = searchParams.get('code');
+
+        let session;
+        if (code) {
+            session = await db.query.qrCodes.findFirst({
+                where: eq(qrCodes.code, code)
+            });
+        } else {
+            // Find the latest active session for this date
+            // Note: In a multi-admin system you might want to filter by teacherId
+            session = await db.query.qrCodes.findFirst({
+                where: eq(qrCodes.isActive, true),
+                orderBy: (qrCodes, { desc }) => [desc(qrCodes.createdAt)]
+            });
+        }
+
+        if (!session) return NextResponse.json({ isActive: false, students: [] });
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Fetch attendance for this session's context (Date + Subject + Section)
+        // Note: We are fetching everyone marked present for THIS subject on THIS date.
+        // This assumes the QR code is for today.
+        
+        const presentStudents = await db.select({
+            usn: students.usn,
+            name: students.name,
+            timestamp: attendance.createdAt,
+        })
+        .from(attendance)
+        .innerJoin(students, eq(attendance.studentId, students.id))
+        .where(and(
+            eq(attendance.date, today),
+            eq(attendance.subject, session.subject),
+            eq(attendance.status, 'present')
+        ));
+
+        return NextResponse.json({ 
+            isActive: session.isActive,
+            code: session.code,
+            subject: session.subject,
+            students: presentStudents 
+        });
+
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

@@ -18,6 +18,7 @@ export default function AttendanceForm({
         students.reduce((acc, s) => ({ ...acc, [s.id]: 'present' }), {})
     );
     const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const router = useRouter();
 
     const handleStatusChange = (studentId: string, status: 'present' | 'absent' | 'late') => {
@@ -49,18 +50,37 @@ export default function AttendanceForm({
         }
     };
 
+    const filteredStudents = students.filter(student => 
+        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (student.usn && student.usn.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
             <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-purple-100/50 border border-slate-200 overflow-hidden">
-                <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Active Attendance Session</h3>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">
-                            Topic: <span className="text-indigo-600">{subject}</span>
-                        </p>
+                <div className="p-8 border-b border-slate-50 bg-slate-50/30">
+                    <div className="flex items-start justify-between mb-8">
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight">Active Attendance Session</h3>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">
+                                Topic: <span className="text-indigo-600">{subject}</span>
+                            </p>
+                        </div>
+                        <div className="px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Total Roster: {students.length}
+                        </div>
                     </div>
-                    <div className="px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Total Roster: {students.length}
+                
+                    <div className="relative max-w-md">
+                         <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                         <input
+                            type="text" 
+                            placeholder="Find student by name or ID..."
+                            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400 shadow-sm"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                         />
                     </div>
                 </div>
 
@@ -73,7 +93,13 @@ export default function AttendanceForm({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {students.map((student) => {
+                            {filteredStudents.length === 0 ? (
+                                <tr>
+                                    <td colSpan={2} className="px-10 py-8 text-center text-slate-400 font-bold text-sm">No students found matching your search.</td>
+                                </tr>
+                            ) : (
+                                filteredStudents.map((student) => {
+
                                 const currentStatus = attendance[student.id];
                                 return (
                                     <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -135,7 +161,8 @@ export default function AttendanceForm({
                                         </td>
                                     </tr>
                                 );
-                            })}
+                            })
+                        )}
                         </tbody>
                     </table>
                 </div>

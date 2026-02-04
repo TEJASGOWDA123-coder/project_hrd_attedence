@@ -1,9 +1,8 @@
 import { db } from '@/lib/db';
-import { teachers, sections, timetable } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { teachers, sections, timetable, attendance } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
-import Link from 'next/link';
-import { ClipboardCheck, ArrowRight, Landmark, Users, Clock } from 'lucide-react';
+import TeacherAttendanceList from '@/components/TeacherAttendanceList';
 
 export default async function TeacherAttendanceSelection() {
     const session = await getSession();
@@ -25,6 +24,41 @@ export default async function TeacherAttendanceSelection() {
         .where(eq(timetable.teacherId, teacher.id))
         .leftJoin(sections, eq(timetable.sectionId, sections.id));
 
+    // Check for today's attendance
+    // Use timezone offset to ensure correct 'local' date for the server/db
+    // For simplicity, we'll use the server's local date or assume usage pattern. 
+    // Ideally, pass client timezone or standardise on UTC. 
+    // Here we use simple YYYY-MM-DD based on server time.
+    const today = new Date();
+    // Adjust to local time string 'YYYY-MM-DD'
+    const todayStr = today.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD
+
+    const todayAttendance = await db.select({
+        sectionId: attendance.sectionId,
+        subject: attendance.subject,
+    })
+    .from(attendance)
+    .where(and(
+        eq(attendance.teacherId, teacher.id),
+        eq(attendance.date, todayStr)
+    ));
+
+    const getStatus = (cls: any): 'completed' | 'pending' => {
+        const isCompleted = todayAttendance.some(
+            a => a.sectionId === cls.sectionId && a.subject === cls.subject
+        );
+        return isCompleted ? 'completed' : 'pending';
+    };
+
+    const dataList = assignedClasses
+        .filter(cls => cls.sectionId !== null && cls.subject !== null)
+        .map(cls => ({
+            sectionId: cls.sectionId as string,
+            sectionName: cls.sectionName,
+            subject: cls.subject as string,
+            status: getStatus(cls)
+        }));
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <header>
@@ -32,49 +66,7 @@ export default async function TeacherAttendanceSelection() {
                 <p className="text-slate-500 mt-1">Select a class to start recording attendance logs.</p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                {assignedClasses.map((cls, idx) => (
-                    <div key={`${cls.sectionId}-${cls.subject}-${idx}`} className="group relative">
-                        <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:shadow-purple-100 transition-all hover:-translate-y-1">
-                            <div className="flex justify-between items-start mb-8">
-                                <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-colors duration-300">
-                                    <Landmark size={24} />
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Section ID</p>
-                                    <p className="text-xs font-bold text-slate-900 mt-1 uppercase tracking-tighter">{cls.sectionId?.substring(0, 8)}</p>
-                                </div>
-                            </div>
-
-                            <div className="mb-2">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{cls.subject || 'No Subject'}</p>
-                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">{cls.sectionName || 'Unknown Section'}</h3>
-                            </div>
-                            <p className="text-sm text-slate-400 font-medium mb-8">Ready for today's roll call session.</p>
-
-                            <Link
-                                href={`/teacher/attendance/${cls.sectionId}?subject=${encodeURIComponent(cls.subject || '')}`}
-                                className="flex items-center justify-between w-full bg-slate-900 text-white p-5 rounded-2xl hover:bg-purple-600 transition-all group-hover:shadow-xl group-hover:shadow-purple-200"
-                            >
-                                <span className="flex items-center gap-3 font-bold text-sm">
-                                    <ClipboardCheck size={18} />
-                                    Mark Now
-                                </span>
-                                <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-                            </Link>
-                        </div>
-                    </div>
-                ))}
-
-                {assignedClasses.length === 0 && (
-                    <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-slate-200">
-                        <div className="flex flex-col items-center gap-4 text-slate-300">
-                            <Users size={64} strokeWidth={1} />
-                            <p className="text-sm font-bold uppercase tracking-widest">No sections assigned specifically to your record.</p>
-                        </div>
-                    </div>
-                )}
-            </div>
+            <TeacherAttendanceList assignedClasses={dataList} />
         </div>
     );
 }

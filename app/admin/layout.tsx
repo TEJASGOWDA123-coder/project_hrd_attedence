@@ -17,7 +17,9 @@ import {
     MessageSquare,
     ChevronDown,
     Menu,
-    X
+    X,
+    QrCode,
+    Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -27,9 +29,11 @@ const navItems = [
     { label: 'Students', href: '/admin/students', icon: Users },
     { label: 'Teachers', href: '/admin/teachers', icon: UserSquare2 },
     { label: 'Attendance', href: '/admin/attendance', icon: ClipboardCheck },
+    { label: 'Event Attendance', href: '/admin/qr', icon: QrCode },
     { label: 'Reports', href: '/admin/reports', icon: FileText },
     { label: 'Sections', href: '/admin/sections', icon: LayoutGrid },
     { label: 'Timetable', href: '/admin/timetable', icon: CalendarDays },
+    { label: 'Admins', href: '/admin/admins', icon: Shield },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

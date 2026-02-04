@@ -8,10 +8,13 @@ export async function GET() {
         id: timetable.id,
         subject: timetable.subject,
         day: timetable.dayOfWeek,
+        date: timetable.date,
         startTime: timetable.startTime,
         endTime: timetable.endTime,
         sectionName: sections.name,
         teacherName: users.name,
+        sectionId: timetable.sectionId,
+        teacherId: timetable.teacherId,
     })
         .from(timetable)
         .leftJoin(sections, eq(timetable.sectionId, sections.id))
@@ -22,11 +25,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const { sectionId, teacherId, subject, dayOfWeek, startTime, endTime } = await request.json();
+    const { sectionId, teacherId, subject, dayOfWeek, date, startTime, endTime } = await request.json();
     const id = Math.random().toString(36).substring(2, 11);
 
     try {
-        await db.insert(timetable).values({ id, sectionId, teacherId, subject, dayOfWeek, startTime, endTime });
+        await db.insert(timetable).values({ id, sectionId, teacherId, subject, dayOfWeek, date, startTime, endTime });
         return NextResponse.json({ success: true });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 400 });

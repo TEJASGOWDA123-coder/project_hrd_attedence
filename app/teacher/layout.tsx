@@ -41,6 +41,72 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
             .catch(err => console.error('Session fetch failed', err));
     }, []);
 
+    useEffect(() => {
+        if ('serviceWorker' in navigator && 'PushManager' in window && user) {
+            const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+            if (!publicKey) {
+                console.error('VAPID public key not found');
+                return;
+            }
+
+            navigator.serviceWorker.register('/sw.js')
+                .then(function (swReg) {
+                    // console.log('Service Worker is registered', swReg);
+
+                    swReg.pushManager.getSubscription()
+                        .then(function (subscription) {
+                            if (subscription) {
+                                // console.log('User is already subscribed:', subscription);
+                                // Optional: Update subscription on server to ensure it matches
+                                updateSubscriptionOnServer(subscription);
+                                return;
+                            }
+
+                            const applicationServerKey = urlBase64ToUint8Array(publicKey);
+                            swReg.pushManager.subscribe({
+                                userVisibleOnly: true,
+                                applicationServerKey: applicationServerKey
+                            })
+                                .then(function (subscription) {
+                                    // console.log('User is subscribed:', subscription);
+                                    updateSubscriptionOnServer(subscription);
+                                })
+                                .catch(function (err) {
+                                    console.log('Failed to subscribe the user: ', err);
+                                });
+                        });
+                })
+                .catch(function (error) {
+                    console.error('Service Worker Error', error);
+                });
+        }
+    }, [user]);
+
+    const updateSubscriptionOnServer = (subscription: PushSubscription) => {
+        fetch('/api/web-push/subscribe', {
+            method: 'POST',
+            body: JSON.stringify({ subscription }),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    };
+
+    function urlBase64ToUint8Array(base64String: string) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
     // Close mobile menu on route change
     useEffect(() => {
         setIsMobileMenuOpen(false);

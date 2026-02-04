@@ -8,7 +8,7 @@ export default function TeacherReportsPage() {
     const [reports, setReports] = useState<any[]>([]);
     const [sections, setSections] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [filter, setFilter] = useState({ sectionId: '', date: '', subject: '' });
+    const [filter, setFilter] = useState({ sectionId: '', startDate: '', endDate: '', subject: '' });
 
     const fetchSections = async () => {
         const res = await fetch('/api/admin/sections'); // Sections are public for choice
@@ -21,7 +21,8 @@ export default function TeacherReportsPage() {
         // Build query params, excluding empty values
         const params = new URLSearchParams();
         if (filter.sectionId) params.append('sectionId', filter.sectionId);
-        if (filter.date) params.append('date', filter.date);
+        if (filter.startDate) params.append('startDate', filter.startDate);
+        if (filter.endDate) params.append('endDate', filter.endDate);
         if (filter.subject) params.append('subject', filter.subject);
 
         const res = await fetch(`/api/teacher/reports?${params.toString()}`);
@@ -53,7 +54,7 @@ export default function TeacherReportsPage() {
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `my_class_report_${filter.date || 'all'}.csv`);
+        link.setAttribute("download", `my_class_report_${filter.startDate || 'start'}_to_${filter.endDate || 'end'}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -91,12 +92,21 @@ export default function TeacherReportsPage() {
                     </div>
                 </div>
                 <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Target Date</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Date</label>
                     <input
                         type="date"
                         className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
-                        value={filter.date}
-                        onChange={(e) => setFilter({ ...filter, date: e.target.value })}
+                        value={filter.startDate}
+                        onChange={(e) => setFilter({ ...filter, startDate: e.target.value })}
+                    />
+                </div>
+                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">End Date</label>
+                    <input
+                        type="date"
+                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                        value={filter.endDate}
+                        onChange={(e) => setFilter({ ...filter, endDate: e.target.value })}
                     />
                 </div>
                 <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">

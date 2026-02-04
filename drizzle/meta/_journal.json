@@ -15,6 +15,13 @@
       "when": 1770019459063,
       "tag": "0001_classy_valeria_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1770214623542,
+      "tag": "0002_high_carlie_cooper",
+      "breakpoints": true
     }
   ]
 }

@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const sectionId = searchParams.get('sectionId');
-    const date = searchParams.get('date');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     const subject = searchParams.get('subject');
 
     let query = db.select({
@@ -24,7 +25,15 @@ export async function GET(request: Request) {
 
     const filters = [];
     if (sectionId && sectionId !== '') filters.push(eq(attendance.sectionId, sectionId));
-    if (date && date !== '') filters.push(eq(attendance.date, date));
+    
+    // Date range filtering
+    if (startDate && startDate !== '') {
+        filters.push(sql`${attendance.date} >= ${startDate}`);
+    }
+    if (endDate && endDate !== '') {
+        filters.push(sql`${attendance.date} <= ${endDate}`);
+    }
+
     if (subject && subject !== '') {
         // Case-insensitive subject filter using LIKE
         filters.push(sql`LOWER(${attendance.subject}) LIKE LOWER(${'%' + subject + '%'})`);

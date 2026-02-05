@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FileText, Download, Filter, Search, Loader2, Calendar as CalIcon, Landmark, User, ShieldCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatLocalTime } from '@/lib/utils';
 
 export default function ReportsPage() {
     const [reports, setReports] = useState<any[]>([]);
@@ -45,7 +45,7 @@ export default function ReportsPage() {
                 `"${r.studentName}"`,
                 `"${r.sectionName}"`,
                 `"${r.subject || 'N/A'}"`,
-                `"${r.date}"`,
+                `"${r.date} ${formatLocalTime(r.createdAt)}"`,
                 `"${r.status}"`,
                 `"${r.attendancePercentage ?? '0'}%"`
             ].join(","))
@@ -233,7 +233,7 @@ export default function ReportsPage() {
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-2 text-slate-400">
                                             <CalIcon size={14} />
-                                            <span className="text-xs font-medium">{report.date}</span>
+                                            <span className="text-xs font-medium">{report.date} • {formatLocalTime(report.createdAt)}</span>
                                         </div>
                                     </td>
                                     <td className="px-8 py-5">

@@ -17,7 +17,7 @@ import {
     History,
     Activity
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatLocalTime } from '@/lib/utils';
 
 export default async function TeacherDashboard() {
     const session = await getSession();
@@ -67,6 +67,7 @@ export default async function TeacherDashboard() {
         date: attendance.date,
         studentName: students.name,
         sectionName: sections.name,
+        createdAt: attendance.createdAt,
     })
         .from(attendance)
         .leftJoin(students, eq(attendance.studentId, students.id))
@@ -200,7 +201,7 @@ export default async function TeacherDashboard() {
                                         </div>
                                         <div>
                                             <p className="text-sm font-black text-slate-900">{log.studentName}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{log.sectionName} • {log.date}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{log.sectionName} • {log.date} • {formatLocalTime(log.createdAt)}</p>
                                         </div>
                                     </div>
                                     <span className={cn(

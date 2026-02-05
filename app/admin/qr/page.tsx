@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, Users, Download, StopCircle, RefreshCw, Copy, Link as LinkIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatLocalTime } from '@/lib/utils';
 
 import * as XLSX from 'xlsx';
 
@@ -26,7 +26,7 @@ export default function QRAttendancePage() {
             const wsname = wb.SheetNames[0];
             const ws = wb.Sheets[wsname];
             const data = XLSX.utils.sheet_to_json(ws);
-            
+
             // Extract USNs (looks for 'USN' or 'usn' column, or fallback)
             const usns = data.map((row: any) => {
                 const key = Object.keys(row).find(k => k.toLowerCase() === 'usn');
@@ -42,17 +42,17 @@ export default function QRAttendancePage() {
     // Polling for updates AND Initial Fetch for active session
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        
+
         const fetchStatus = async (code?: string) => {
             try {
                 const url = code ? `/api/admin/qr/status?code=${code}` : `/api/admin/qr/status`;
                 const res = await fetch(url);
                 const data = await res.json();
-                
+
                 if (data.students) {
                     setAttendedStudents(data.students);
                 }
-                
+
                 if (data.isActive) {
                     if (!activeSession) {
                         setSessionCode(data.code);
@@ -77,14 +77,14 @@ export default function QRAttendancePage() {
             fetchStatus(sessionCode); // Initial call
             interval = setInterval(() => fetchStatus(sessionCode), 5000); // Poll every 5s
         }
-        
+
         return () => clearInterval(interval);
     }, [activeSession, sessionCode]);
 
     const handleCreate = async () => {
         if (!subject) return alert('Please enter an Event Name');
         if (allowedStudents.length === 0) return alert('Please upload an Excel list first');
-        
+
         setLoading(true);
         try {
             const payload = {
@@ -132,7 +132,7 @@ export default function QRAttendancePage() {
 
     const exportToCSV = () => {
         const headers = ['USN', 'Name', 'Time'];
-        const rows = attendedStudents.map(s => [s.usn, s.name, new Date(s.timestamp).toLocaleTimeString()]);
+        const rows = attendedStudents.map(s => [s.usn, s.name, formatLocalTime(s.timestamp)]);
         const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -154,12 +154,12 @@ export default function QRAttendancePage() {
 
             {!activeSession ? (
                 <div className="bg-white rounded-[2rem] p-8 md:p-12 shadow-xl shadow-slate-200/50 border border-slate-200 max-w-xl mx-auto">
-                     <div className="space-y-6">
+                    <div className="space-y-6">
                         <div>
                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">Upload Student List (Excel)</label>
                             <div className="mt-2 border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:bg-slate-50 transition-colors relative">
-                                <input 
-                                    type="file" 
+                                <input
+                                    type="file"
                                     accept=".xlsx, .xls"
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     onChange={handleFileUpload}
@@ -176,14 +176,14 @@ export default function QRAttendancePage() {
 
                         <div>
                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">Event Name</label>
-                            <input 
+                            <input
                                 className="w-full mt-2 px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
                                 placeholder="e.g. Workshop Check-in"
                                 value={subject}
                                 onChange={e => setSubject(e.target.value)}
                             />
                         </div>
-                        <button 
+                        <button
                             onClick={handleCreate}
                             disabled={loading}
                             className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -200,13 +200,13 @@ export default function QRAttendancePage() {
                             <h2 className="text-3xl font-black text-slate-900 mb-2">{subject}</h2>
                             <p className="text-slate-500 font-medium">Scan to mark attendance</p>
                         </div>
-                        
+
                         <div className="p-4 bg-white border-4 border-slate-900 rounded-3xl shadow-2xl">
                             <QRCodeSVG value={attendanceUrl} size={256} className="w-64 h-64" />
                         </div>
 
                         <div className="flex flex-col gap-2 w-full max-w-sm">
-                             <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 break-all select-all">
+                            <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 break-all select-all">
                                 <LinkIcon size={14} className="shrink-0" />
                                 {attendanceUrl}
                             </div>
@@ -253,7 +253,7 @@ export default function QRAttendancePage() {
                                         </div>
                                         <div className="text-right">
                                             <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-                                                {new Date(s.timestamp).toLocaleTimeString()}
+                                                {formatLocalTime(s.timestamp)}
                                             </span>
                                         </div>
                                     </div>

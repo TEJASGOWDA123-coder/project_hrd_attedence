@@ -19,7 +19,7 @@ import {
     ArrowRight,
     History
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatLocalTime } from '@/lib/utils';
 import Link from 'next/link';
 
 async function getStats() {
@@ -264,7 +264,7 @@ export default async function AdminDashboard() {
                                     <div className="flex-1 border-b border-slate-50 pb-4 last:border-none">
                                         <div className="flex justify-between items-start">
                                             <p className="text-sm font-black text-slate-900">{log.studentName}</p>
-                                            <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">{log.createdAt?.split(' ')[1] || 'Today'}</span>
+                                            <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">{formatLocalTime(log.createdAt)}</span>
                                         </div>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">

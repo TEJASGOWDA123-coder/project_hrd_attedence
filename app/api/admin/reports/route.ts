@@ -18,6 +18,7 @@ export async function GET(request: Request) {
         studentName: students.name,
         sectionName: sections.name,
         attendancePercentage: students.attendancePercentage,
+        createdAt: attendance.createdAt,
     })
         .from(attendance)
         .leftJoin(students, eq(attendance.studentId, students.id))
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
 
     const filters = [];
     if (sectionId && sectionId !== '') filters.push(eq(attendance.sectionId, sectionId));
-    
+
     // Date range filtering
     if (startDate && startDate !== '') {
         filters.push(sql`${attendance.date} >= ${startDate}`);

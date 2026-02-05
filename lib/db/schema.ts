@@ -83,3 +83,11 @@ export const sessionAllowedStudents = sqliteTable('session_allowed_students', {
   qrCodeId: text('qr_code_id').notNull().references(() => qrCodes.id, { onDelete: 'cascade' }),
   usn: text('usn').notNull(),
 });
+
+export const sentNotifications = sqliteTable('sent_notifications', {
+  id: text('id').primaryKey(),
+  timetableId: text('timetable_id').notNull().references(() => timetable.id, { onDelete: 'cascade' }),
+  teacherId: text('teacher_id').notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+  date: text('date').notNull(), // YYYY-MM-DD
+  sentAt: text('sent_at').default(sql`CURRENT_TIMESTAMP`),
+});

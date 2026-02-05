@@ -1,9 +1,10 @@
 import cron from 'node-cron';
 import { db } from '@/lib/db';
-import { timetable, teachers } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { timetable, teachers, users, sentNotifications } from '@/lib/db/schema';
+import { eq, and, sql } from 'drizzle-orm';
 // @ts-ignore
 import webpush from 'web-push';
+import { v4 as uuidv4 } from 'uuid';
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -11,10 +12,10 @@ export function initCron() {
     // Only run on server
     if (typeof window !== 'undefined') return;
 
+    console.log('Initializing cron job: Reminders check every minute');
+
     // Check every minute
     cron.schedule('* * * * *', async () => {
-        // console.log('Running cron job: Checking for upcoming classes...');
-
         if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
             console.error('VAPID keys not set');
             return;
@@ -26,71 +27,101 @@ export function initCron() {
             process.env.VAPID_PRIVATE_KEY
         );
 
-        const now = new Date();
-        const tenMinutesLater = new Date(now.getTime() + 10 * 60000); // 10 minutes from now
+        // Get current time in IST (India Standard Time)
+        // Since the server might be in a different timezone, we force IST.
+        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
-        const dayName = days[tenMinutesLater.getDay()];
-        // Format time as HH:MM
-        const hours = tenMinutesLater.getHours().toString().padStart(2, '0');
-        const minutes = tenMinutesLater.getMinutes().toString().padStart(2, '0');
-        const targetTime = `${hours}:${minutes}`;
+        // We look for classes starting between 9 and 11 minutes from now
+        // This gives us a 2-minute window to catch it, but we'll use sent_notifications to avoid double sends.
+        const targetMin = new Date(nowIST.getTime() + 9 * 60000);
+        const targetMax = new Date(nowIST.getTime() + 11 * 60000);
 
-        // Format date as YYYY-MM-DD
-        const year = tenMinutesLater.getFullYear();
-        const month = (tenMinutesLater.getMonth() + 1).toString().padStart(2, '0');
-        const day = tenMinutesLater.getDate().toString().padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
+        const formatTime = (d: Date) => {
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        };
 
-        // console.log(`Checking for classes on ${dayName} at ${targetTime}`);
+        const dayName = days[targetMin.getDay()];
+        const dateStr = targetMin.toISOString().split('T')[0];
 
         try {
-             // Find classes starting at targetTime on dayName
-             // Must match dayOfWeek AND (date IS NULL OR date = dateStr)
-             // Actually, if date IS NOT NULL, dayOfWeek should match automatically if data is correct, 
-             // but we must check date to avoid triggering "next week's" specific date.
-             
-            const upcomingClasses = await db.select({
-                subject: timetable.subject,
-                startTime: timetable.startTime,
-                teacherId: timetable.teacherId,
-                date: timetable.date,
-            })
-            .from(timetable)
-            .where(and(
-                eq(timetable.startTime, targetTime),
-                eq(timetable.dayOfWeek, dayName) // Optimization: narrow down by day first
-            ));
+            // Find upcoming classes
+            // We'll broaden the search to any class on this day, then filter by time in-memory for precision
+            const upcomingClasses = await db.select()
+                .from(timetable)
+                .where(eq(timetable.dayOfWeek, dayName));
 
-            // In-memory filter for date logic (because OR condition with IS NULL in simple Drizzle query can be verbose, 
-            // and we already filtered significantly by time and day).
             const filteredClasses = upcomingClasses.filter(cls => {
-                if (cls.date) {
-                    return cls.date === dateStr;
-                }
-                return true; // Recurring class (date is null)
+                // Check if specific date matches if it exists
+                if (cls.date && cls.date !== dateStr) return false;
+
+                // Check if start time is within our window
+                const [h, m] = cls.startTime.split(':').map(Number);
+                const classStartTime = new Date(targetMin);
+                classStartTime.setHours(h, m, 0, 0);
+
+                return classStartTime >= targetMin && classStartTime <= targetMax;
             });
 
             if (filteredClasses.length > 0) {
-                console.log(`Found ${filteredClasses.length} upcoming classes at ${targetTime}.`);
-
                 for (const cls of filteredClasses) {
-                    const teacher = await db.query.teachers.findFirst({
-                         where: eq(teachers.id, cls.teacherId),
+                    // Check if already sent
+                    const alreadySent = await db.query.sentNotifications.findFirst({
+                        where: and(
+                            eq(sentNotifications.timetableId, cls.id),
+                            eq(sentNotifications.date, dateStr)
+                        )
                     });
 
-                    if (teacher && teacher.pushSubscription) {
-                        try {
-                            const subscription = JSON.parse(teacher.pushSubscription);
-                            const payload = JSON.stringify({
-                                title: 'Upcoming Class Reminder',
-                                body: `You have a class (${cls.subject}) starting in 10 minutes at ${cls.startTime}.`,
-                            });
+                    if (alreadySent) continue;
 
-                            await webpush.sendNotification(subscription, payload);
-                            console.log(`Notification sent to teacher ${cls.teacherId}`);
-                        } catch (error) {
-                            console.error(`Error sending notification to teacher ${cls.teacherId}:`, error);
+                    const teacher = await db.query.teachers.findFirst({
+                        where: eq(teachers.id, cls.teacherId),
+                    });
+
+                    if (teacher) {
+                        // Push Notification
+                        if (teacher.pushSubscription) {
+                            try {
+                                const subscription = JSON.parse(teacher.pushSubscription);
+                                const payload = JSON.stringify({
+                                    title: 'Upcoming Class Reminder',
+                                    body: `Your ${cls.subject} class starts in 10 minutes (${cls.startTime}).`,
+                                });
+
+                                await webpush.sendNotification(subscription, payload);
+                                console.log(`Push notification sent for class ${cls.subject} at ${cls.startTime}`);
+                            } catch (error) {
+                                console.error(`Error sending push notification for class ${cls.id}:`, error);
+                            }
                         }
+
+                        // Email Notification
+                        const teacherUser = await db.query.users.findFirst({
+                            where: eq(users.id, teacher.userId)
+                        });
+
+                        if (teacherUser && teacherUser.email) {
+                            try {
+                                const { sendEmail } = await import('@/lib/email');
+                                await sendEmail({
+                                    to: teacherUser.email,
+                                    subject: `⏰ Reminder: ${cls.subject} starts in 10 minutes`,
+                                    text: `Hello ${teacherUser.name}, your ${cls.subject} class is scheduled to start at ${cls.startTime} today.`,
+                                    html: `<p>Hello <b>${teacherUser.name}</b>,</p><p>Your <b>${cls.subject}</b> class is scheduled to start at <b>${cls.startTime}</b> today.</p>`
+                                });
+                                console.log(`Email reminder sent to ${teacherUser.email}`);
+                            } catch (error) {
+                                console.error(`Error sending email notification for class ${cls.id}:`, error);
+                            }
+                        }
+
+                        // Log as sent
+                        await db.insert(sentNotifications).values({
+                            id: uuidv4(),
+                            timetableId: cls.id,
+                            teacherId: teacher.id,
+                            date: dateStr,
+                        });
                     }
                 }
             }

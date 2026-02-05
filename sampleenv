@@ -13,3 +13,16 @@ NODE_ENV="development"
 NEXT_PUBLIC_VAPID_PUBLIC_KEY="BPMxqxpzBGuf92b-V9I5MoQV_bjPaf0ailegEpW7t8o0VXuEMJVE3YB7sUH-x6r5jJXp_27JMAF1ACJXWelT0bs"
 VAPID_PRIVATE_KEY="M00XDJlc8gTtUyZuD3uGMQaH_OomzKAmZjxgmWsoYMI"
 VAPID_SUBJECT="mailto:admin@example.com"
+
+# Email Configuration
+EMAIL_USER=
+EMAIL_PASS=
+EMAIL_FROM="HRD Attendance System <your-email@gmail.com>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+
+
+fqyj ydgh qlnl njgr
+
+tejasgowda943@gmail.com

@@ -196,21 +196,21 @@ export default async function AdminDashboard() {
                         </div>
                     </div>
 
-                    <div className="h-64 relative bg-slate-50 rounded-3xl border border-dashed border-slate-200 flex items-end justify-center p-4 md:p-8 gap-2 md:gap-4 overflow-hidden">
+                    <div className="h-64 relative bg-slate-50/50 rounded-3xl border border-dashed border-slate-200 flex items-end justify-center p-4 md:p-8 gap-2 md:gap-4 overflow-hidden">
                         {stats.dailyTrends.length > 0 ? stats.dailyTrends.map((t, i) => {
                             const height = (t.present / (t.total || 1)) * 100;
                             return (
                                 <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
                                     <div className="w-full relative flex items-end justify-center group">
                                         <div
-                                            className="w-full max-w-[30px] md:max-w-[40px] bg-indigo-500 rounded-t-xl transition-all duration-1000 group-hover:bg-indigo-600 shadow-lg shadow-indigo-100"
-                                            style={{ height: `${Math.max(10, height)}%` }}
+                                            className="w-full max-w-[30px] md:max-w-[40px] bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-xl transition-all duration-1000 group-hover:from-indigo-700 group-hover:to-indigo-500 shadow-lg shadow-indigo-100 border-x border-t border-indigo-700/20"
+                                            style={{ height: `${Math.max(15, height)}%` }}
                                         />
                                         <div className="absolute -top-8 bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                                             {height.toFixed(0)}%
                                         </div>
                                     </div>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.date.split('-').slice(1).join('/')}</span>
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.date.split('-').slice(1).join('/')}</span>
                                 </div>
                             );
                         }) : (

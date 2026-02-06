@@ -62,3 +62,32 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
 }
+export async function PATCH(request: Request) {
+    const { id, name, email, password, specialization } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+
+    try {
+        const teacher = await db.query.teachers.findFirst({
+            where: eq(teachers.id, id),
+        });
+
+        if (!teacher) return NextResponse.json({ error: 'Teacher not found' }, { status: 404 });
+
+        const updateData: any = { name, email };
+        if (password && password.length > 0) {
+            updateData.passwordHash = await bcrypt.hash(password, 10);
+        }
+
+        await db.update(users)
+            .set(updateData)
+            .where(eq(users.id, teacher.userId));
+
+        await db.update(teachers)
+            .set({ specialization })
+            .where(eq(teachers.id, id));
+
+        return NextResponse.json({ success: true });
+    } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+}

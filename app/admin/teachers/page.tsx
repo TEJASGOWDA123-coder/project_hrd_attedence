@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Search, UserSquare2, Mail, GraduationCap, X, Loader2 } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, X, GraduationCap, ShieldCheck, Mail, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function TeachersPage() {
@@ -9,11 +9,12 @@ export default function TeachersPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
-    const [formData, setFormData] = useState({ name: '', email: '', password: '', specialization: '' });
+    const [editMode, setEditMode] = useState(false);
+    const [formData, setFormData] = useState({ id: '', name: '', email: '', password: '', specialization: '' });
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const fetchTeachers = async () => {
+    const fetchData = async () => {
         setLoading(true);
         const res = await fetch('/api/admin/teachers');
         const data = await res.json();
@@ -22,7 +23,7 @@ export default function TeachersPage() {
     };
 
     useEffect(() => {
-        fetchTeachers();
+        fetchData();
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -30,14 +31,15 @@ export default function TeachersPage() {
         setSubmitting(true);
         setError('');
         const res = await fetch('/api/admin/teachers', {
-            method: 'POST',
+            method: editMode ? 'PATCH' : 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData),
         });
         if (res.ok) {
             setShowModal(false);
-            setFormData({ name: '', email: '', password: '', specialization: '' });
-            fetchTeachers();
+            setEditMode(false);
+            setFormData({ id: '', name: '', email: '', password: '', specialization: '' });
+            fetchData();
         } else {
             const data = await res.json();
             setError(data.error);
@@ -46,10 +48,22 @@ export default function TeachersPage() {
     };
 
     const handleDelete = async (id: string, name: string) => {
-        if (confirm(`Remove ${name} from teaching staff?`)) {
+        if (confirm(`Remove access for ${name}? This action cannot be undone.`)) {
             await fetch(`/api/admin/teachers?id=${id}`, { method: 'DELETE' });
-            fetchTeachers();
+            fetchData();
         }
+    };
+
+    const handleEdit = (teacher: any) => {
+        setFormData({
+            id: teacher.id,
+            name: teacher.name,
+            email: teacher.email,
+            password: '', // Keep empty for no change
+            specialization: teacher.specialization || ''
+        });
+        setEditMode(true);
+        setShowModal(true);
     };
 
     const [selectedSpecialization, setSelectedSpecialization] = useState('');
@@ -71,10 +85,14 @@ export default function TeachersPage() {
                     <p className="text-slate-500 mt-1">Direct and organize your academic staff.</p>
                 </div>
                 <button
-                    onClick={() => setShowModal(true)}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                    onClick={() => {
+                        setEditMode(false);
+                        setFormData({ id: '', name: '', email: '', password: '', specialization: '' });
+                        setShowModal(true);
+                    }}
+                    className="bg-indigo-600 text-white px-8 py-4 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
                 >
-                    <Plus size={20} /> Add New Teacher
+                    <Plus size={20} /> Add Faculty Member
                 </button>
             </header>
 
@@ -161,13 +179,22 @@ export default function TeachersPage() {
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-right">
+                                        <div className="flex justify-end gap-2">
+                                        <button
+                                            onClick={() => handleEdit(teacher)}
+                                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                            title="Edit Profile"
+                                        >
+                                            <ShieldAlert size={18} />
+                                        </button>
                                         <button
                                             onClick={() => handleDelete(teacher.id, teacher.name)}
-                                            className="p-2.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all active:scale-90"
-                                            title="Delete Teacher"
+                                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                            title="Revoke Access"
                                         >
                                             <Trash2 size={18} />
                                         </button>
+                                    </div>
                                     </td>
                                 </tr>
                             ))}
@@ -181,9 +208,14 @@ export default function TeachersPage() {
                     <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
                         <div className="p-10">
                             <div className="flex justify-between items-start mb-8">
-                                <div>
-                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Add Teacher</h2>
-                                    <p className="text-slate-400 text-sm font-medium mt-1">Fill in the details for the new staff member.</p>
+                                <div className="text-center mb-10">
+                                    <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-4">
+                                        <Plus size={32} />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-slate-900">{editMode ? 'Edit Faculty Record' : 'New Faculty Credentials'}</h2>
+                                    <p className="text-slate-400 text-sm font-medium mt-1">
+                                        {editMode ? 'Update teacher profile details and access.' : 'Generate access tokens for an educator.'}
+                                    </p>
                                 </div>
                                 <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
                                     <X size={24} />
@@ -222,16 +254,16 @@ export default function TeachersPage() {
                                     </div>
 
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Default Password</label>
-                                        <input
-                                            required
-                                            type="password"
-                                            placeholder="••••••••"
-                                            className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
-                                            value={formData.password}
-                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        />
-                                    </div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Access Key (Password)</label>
+                                    <input 
+                                        required={!editMode} 
+                                        type="password" 
+                                        placeholder={editMode ? "Leave blank to keep current" : "Min. 8 characters"} 
+                                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" 
+                                        value={formData.password} 
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
+                                    />
+                                </div>
 
                                     <div className="space-y-1.5 col-span-2">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Academic Specialization</label>
@@ -252,13 +284,9 @@ export default function TeachersPage() {
                                     >
                                         Discard
                                     </button>
-                                    <button
-                                        type="submit"
-                                        disabled={submitting}
-                                        className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        {submitting ? <Loader2 className="animate-spin" size={20} /> : "Save Teacher Profile"}
-                                    </button>
+                                    <button type="submit" disabled={submitting} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all flex items-center justify-center gap-2">
+                                    {submitting ? <Loader2 className="animate-spin" size={20} /> : (editMode ? "Update Faculty Profile" : "Save Teacher Profile")}
+                                </button>
                                 </div>
                             </form>
                         </div>

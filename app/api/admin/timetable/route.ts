@@ -78,3 +78,16 @@ export async function DELETE(request: Request) {
     }
 }
 
+export async function PATCH(request: Request) {
+    const { id, sectionId, teacherId, subject, dayOfWeek, date, startTime, endTime } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+
+    try {
+        await db.update(timetable)
+            .set({ sectionId, teacherId, subject, dayOfWeek, date, startTime, endTime })
+            .where(eq(timetable.id, id));
+        return NextResponse.json({ success: true });
+    } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+}

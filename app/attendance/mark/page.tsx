@@ -8,6 +8,7 @@ import Image from 'next/image';
 function AttendanceForm() {
     const searchParams = useSearchParams();
     const code = searchParams.get('code');
+    const token = searchParams.get('token');
     
     const [usn, setUsn] = useState('');
     const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -16,14 +17,28 @@ function AttendanceForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!usn || !code) return;
+        if (!usn || !code || !token) return;
 
         setStatus('loading');
         try {
+            let lat = null;
+            let lng = null;
+
+            // Try to get location
+            try {
+                const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                });
+                lat = pos.coords.latitude;
+                lng = pos.coords.longitude;
+            } catch (err) {
+                console.warn("Location not provided. Verification might fail if session is locked.");
+            }
+
             const res = await fetch('/api/attendance/mark', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code, usn })
+                body: JSON.stringify({ code, token, usn, lat, lng })
             });
             const data = await res.json();
 
@@ -41,7 +56,7 @@ function AttendanceForm() {
         }
     };
 
-    if (!code) {
+    if (!code || !token) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
                 <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-sm w-full">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, X, Clock, Save, User, Mail, ShieldAlert, Loader2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -8,15 +8,24 @@ import { cn } from '@/lib/utils';
 export default function AttendanceForm({
     students,
     sectionId,
-    subject
+    subject,
+    timetableId,
+    sectionName,
+    endTime,
+    initialAttendance
 }: {
     students: any[],
     sectionId: string,
-    subject: string
+    subject: string,
+    timetableId?: string,
+    sectionName: string,
+    endTime?: string,
+    initialAttendance?: Record<string, 'present' | 'absent' | 'late'>
 }) {
-    const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'late'>>(
-        students.reduce((acc, s) => ({ ...acc, [s.id]: 'present' }), {})
-    );
+    const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'late'>>(() => {
+        if (initialAttendance && Object.keys(initialAttendance).length > 0) return initialAttendance;
+        return students.reduce((acc, s) => ({ ...acc, [s.id]: 'present' }), {});
+    });
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const router = useRouter();
@@ -25,7 +34,7 @@ export default function AttendanceForm({
         setAttendance(prev => ({ ...prev, [studentId]: status }));
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (isDraft: boolean = false) => {
         setLoading(true);
         try {
             const res = await fetch('/api/teacher/attendance', {
@@ -33,26 +42,56 @@ export default function AttendanceForm({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     sectionId,
+                    timetableId,
                     records: attendance,
-                    subject // Include the subject in the payload
+                    subject,
+                    isDraft,
                 }),
             });
 
             if (res.ok) {
-                router.push('/teacher/dashboard');
+                if (isDraft) {
+                    // silent success for auto-submit
+                    if (!isDraft) router.push('/teacher/attendance');
+                } else {
+                    router.push('/teacher/attendance');
+                }
             } else {
-                alert('Verification failed. Please try again.');
+                const data = await res.json();
+                if (!isDraft) alert(data.error || 'Verification failed. Please try again.');
             }
         } catch (err) {
-            alert('System connectivity issue.');
+            if (!isDraft) alert('System connectivity issue.');
         } finally {
             setLoading(false);
         }
     };
 
+    // Auto-Submit Logic
+    useEffect(() => {
+        if (!endTime) return;
+
+        const timer = setInterval(() => {
+            const now = new Date();
+            const [endH, endM] = endTime.split(':').map(Number);
+            const endTimeDate = new Date();
+            endTimeDate.setHours(endH, endM, 0, 0);
+
+            const diffMinutes = (endTimeDate.getTime() - now.getTime()) / 1000 / 60;
+
+            // Auto-submit 5 minutes before ending
+            if (diffMinutes > 0 && diffMinutes <= 5) {
+                console.log('Auto-submitting attendance...');
+                handleSubmit(false);
+                clearInterval(timer);
+            }
+        }, 60000); // Check every minute
+
+        return () => clearInterval(timer);
+    }, [endTime, attendance]);
+
     const filteredStudents = students.filter(student => 
         student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (student.usn && student.usn.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
@@ -111,8 +150,7 @@ export default function AttendanceForm({
                                                 <div className="min-w-0">
                                                     <p className="text-xs md:text-sm font-black text-slate-900 leading-tight truncate">{student.name}</p>
                                                     <div className="flex items-center gap-1.5 mt-1 text-slate-400">
-                                                        <Mail size={12} className="shrink-0" />
-                                                        <span className="text-[10px] md:text-xs font-medium truncate">{student.email}</span>
+                                                        <span className="text-[10px] md:text-xs font-black uppercase tracking-tighter">{student.usn}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -168,24 +206,34 @@ export default function AttendanceForm({
                 </div>
             </div>
 
-            <div className="flex justify-between items-center bg-white p-8 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-100/50">
-                <div className="flex items-center gap-4 text-slate-400">
-                    <ShieldAlert size={20} />
-                    <p className="text-xs font-bold uppercase tracking-widest">Always verify student ID before finalizing</p>
+            <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-100/50 gap-4">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => handleSubmit(true)}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        <Save size={18} />
+                        Save Progress
+                    </button>
+                    <div className="flex items-center gap-4 text-slate-400 ml-4 hidden lg:flex">
+                        <ShieldAlert size={20} />
+                        <p className="text-xs font-bold uppercase tracking-widest leading-none">Auto-finalizes {endTime ? `at ${endTime}` : 'at session end'}</p>
+                    </div>
                 </div>
                 <button
-                    onClick={handleSubmit}
+                    onClick={() => handleSubmit(false)}
                     disabled={loading}
-                    className="bg-purple-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-purple-100 hover:bg-purple-700 hover:shadow-purple-200 transition-all flex items-center gap-3 active:scale-[0.98] disabled:opacity-50"
+                    className="w-full md:w-auto bg-purple-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-purple-100 hover:bg-purple-700 hover:shadow-purple-200 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
                 >
                     {loading ? (
                         <>
                             <Loader2 className="animate-spin" size={20} />
-                            Securing Data...
+                            Processing...
                         </>
                     ) : (
                         <>
-                            Submit Final Record
+                            Finalize Session
                             <ArrowRight size={20} />
                         </>
                     )}

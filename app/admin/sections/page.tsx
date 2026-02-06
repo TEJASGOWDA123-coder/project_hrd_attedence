@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, LayoutGrid, Loader2, Hash } from 'lucide-react';
+import { Plus, Trash2, LayoutGrid, Loader2, ArrowRight, Landmark, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SectionsPage() {
@@ -10,6 +10,8 @@ export default function SectionsPage() {
     const [sections, setSections] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [name, setName] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -44,24 +46,34 @@ export default function SectionsPage() {
         e.preventDefault();
         setSubmitting(true);
         const res = await fetch('/api/admin/sections', {
-            method: 'POST',
+            method: editMode ? 'PATCH' : 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name }),
+            body: JSON.stringify({ id: selectedId, name }),
         });
         if (res.ok) {
             setShowModal(false);
+            setEditMode(false);
+            setSelectedId(null);
             setName('');
             fetchSections();
+        } else {
+            // Handle error if needed
         }
         setSubmitting(false);
     };
 
-    const handleDelete = async (e: React.MouseEvent, id: string, sectionName: string) => {
-        e.stopPropagation();
-        if (confirm(`Permanentely delete ${sectionName}? This will affect all associated data.`)) {
+    const handleDelete = async (id: string, name: string) => {
+        if (confirm(`Delete section ${name}? This will affect student associations.`)) {
             await fetch(`/api/admin/sections?id=${id}`, { method: 'DELETE' });
             fetchSections();
         }
+    };
+
+    const handleEdit = (section: any) => {
+        setSelectedId(section.id);
+        setName(section.name);
+        setEditMode(true);
+        setShowModal(true);
     };
 
     return (
@@ -72,10 +84,14 @@ export default function SectionsPage() {
                     <p className="text-slate-500 mt-1">Organize your institution's academic structure.</p>
                 </div>
                 <button
-                    onClick={() => setShowModal(true)}
-                    className="w-full md:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                    onClick={() => {
+                        setEditMode(false);
+                        setName('');
+                        setShowModal(true);
+                    }}
+                    className="w-full md:w-auto bg-indigo-600 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
                 >
-                    <Plus size={20} /> New Section
+                    <Plus size={20} /> Create New Section
                 </button>
             </header>
 
@@ -105,13 +121,21 @@ export default function SectionsPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={(e) => handleDelete(e, section.id, section.name)}
-                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                                    title="Delete Section"
-                                >
-                                    <Trash2 size={20} />
-                                </button>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleEdit(section); }}
+                                        className="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                        Edit Details
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDelete(section.id, section.name); }}
+                                        className="p-3 bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 rounded-xl transition-all shadow-sm"
+                                        title="Delete Section"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="mt-8 flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-indigo-50 transition-colors">
@@ -134,13 +158,13 @@ export default function SectionsPage() {
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-6 z-[60] animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
                         <div className="p-10 text-center">
-                            <div className="flex justify-center mb-6">
-                                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 border border-indigo-100">
-                                    <LayoutGrid size={32} />
-                                </div>
+                            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                                <Landmark size={32} />
                             </div>
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Create Section</h2>
-                            <p className="text-slate-400 text-sm font-medium mt-1 mb-8">Define a new academic group or class.</p>
+                            <h2 className="text-2xl font-black text-slate-900 mb-2">{editMode ? 'Edit Section' : 'Add New Section'}</h2>
+                            <p className="text-slate-400 text-sm font-medium mb-8">
+                                {editMode ? 'Update the section identifier.' : 'Define a new academic division.'}
+                            </p>
 
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="text-left space-y-1.5">
@@ -148,14 +172,14 @@ export default function SectionsPage() {
                                     <input
                                         required
                                         type="text"
-                                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus-ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         placeholder="e.g. MCA C 2024-2026"
                                     />
                                 </div>
 
-                                <div className="flex gap-4">
+                                <div className="flex gap-4 mt-10">
                                     <button
                                         type="button"
                                         onClick={() => setShowModal(false)}

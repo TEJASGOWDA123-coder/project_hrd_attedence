@@ -43,9 +43,13 @@ export default async function AdminAttendancePage() {
                     <button className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-slate-600 shadow-sm transition-all active:scale-95">
                         <Filter size={20} />
                     </button>
-                    <button className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm">
-                        Refresh Diagnostics
-                    </button>
+                    <Link 
+                        href="/admin/attendance/sessions"
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                    >
+                        <Clock size={18} />
+                        Session History
+                    </Link>
                 </div>
             </header>
 

@@ -96,7 +96,6 @@ export default function RosterPage() {
                                     <tr>
                                         <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">USN</th>
                                         <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Name</th>
-                                        <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Email</th>
                                         <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">Attendance</th>
                                     </tr>
                                 </thead>
@@ -119,7 +118,6 @@ export default function RosterPage() {
                                             <tr className="bg-white hover:bg-indigo-50/30 transition-colors">
                                                 <td className="px-6 py-3 text-xs font-black text-indigo-600">{student.usn}</td>
                                                 <td className="px-6 py-3 text-xs font-bold text-slate-900">{student.name}</td>
-                                                <td className="px-6 py-3 text-xs text-slate-500">{student.email}</td>
                                                 <td className="px-6 py-3">
                                                     <div className="flex items-center gap-2">
                                                         <div className="flex flex-col items-center gap-1">

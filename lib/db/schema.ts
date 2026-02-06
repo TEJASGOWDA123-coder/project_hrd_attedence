@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const users = sqliteTable('users', {
@@ -21,10 +21,8 @@ export const students = sqliteTable('students', {
   id: text('id').primaryKey(),
   usn: text('usn').unique().notNull(),
   name: text('name').notNull(),
-  email: text('email').notNull().unique(),
   batch: text('batch'),
   year: text('year'),
-  phone: text('phone'),
   sectionId: text('section_id').references(() => sections.id, { onDelete: 'set null' }),
   attendancePercentage: integer('attendance_percentage').default(0),
 });
@@ -50,9 +48,12 @@ export const attendance = sqliteTable('attendance', {
   studentId: text('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
   sectionId: text('section_id').references(() => sections.id, { onDelete: 'cascade' }),
   teacherId: text('teacher_id').references(() => teachers.id, { onDelete: 'cascade' }),
+  timetableId: text('timetable_id').references(() => timetable.id, { onDelete: 'set null' }),
   date: text('date').notNull(), // YYYY-MM-DD
   status: text('status', { enum: ['present', 'absent', 'late'] }).notNull(),
   subject: text('subject'), // Assigned subject for this record
+  isDraft: integer('is_draft', { mode: 'boolean' }).default(false),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -74,7 +75,13 @@ export const qrCodes = sqliteTable('qr_codes', {
   subject: text('subject').notNull(),
   teacherId: text('teacher_id').references(() => teachers.id), // Optional, tracking who created it
   code: text('code').notNull().unique(), // The random token
+  rotatingToken: text('rotating_token'), // Time-based token
+  previousToken: text('previous_token'), // Buffer token for grace period
+  tokenUpdatedAt: text('token_updated_at'), // When the token was last changed
   isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  latitude: real('latitude'),
+  longitude: real('longitude'),
+  radius: integer('radius').default(100), // Default 100 meters
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 });
 

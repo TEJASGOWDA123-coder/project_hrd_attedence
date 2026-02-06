@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Search, Calendar, ChevronRight, X, Loader2, BookOpen, User, Clock, Landmark } from 'lucide-react';
+import { Plus, Search, Filter, Calendar, Trash2, Loader2, X, ChevronRight, LayoutGrid, Clock, Users, Edit2, Landmark, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function TimetablePage() {
@@ -10,15 +10,17 @@ export default function TimetablePage() {
     const [teachers, setTeachers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [schedType, setSchedType] = useState<'weekly' | 'date'>('weekly');
     const [formData, setFormData] = useState({
+        subject: '',
         sectionId: '',
         teacherId: '',
-        subject: '',
         dayOfWeek: 'Monday',
         date: '',
-        startTime: '09:00',
-        endTime: '10:00'
+        startTime: '',
+        endTime: '',
     });
     const [submitting, setSubmitting] = useState(false);
     const [showTodayOnly, setShowTodayOnly] = useState(false);
@@ -60,14 +62,26 @@ export default function TimetablePage() {
         };
 
         const res = await fetch('/api/admin/timetable', {
-            method: 'POST',
+            method: editMode ? 'PATCH' : 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(editMode ? { id: selectedId, ...payload } : payload),
         });
         if (res.ok) {
             setShowModal(false);
-            setFormData({ sectionId: '', teacherId: '', subject: '', dayOfWeek: 'Monday', date: '', startTime: '09:00', endTime: '10:00' });
+            setEditMode(false);
+            setSelectedId(null);
+            setFormData({
+                subject: '',
+                sectionId: '',
+                teacherId: '',
+                dayOfWeek: 'Monday',
+                date: '',
+                startTime: '',
+                endTime: '',
+            });
             fetchData();
+        } else {
+            console.error('Failed to submit data');
         }
         setSubmitting(false);
     };
@@ -77,6 +91,22 @@ export default function TimetablePage() {
             const res = await fetch(`/api/admin/timetable?id=${id}`, { method: 'DELETE' });
             if (res.ok) fetchData();
         }
+    };
+
+    const handleEdit = (entry: any) => {
+        setSelectedId(entry.id);
+        setFormData({
+            subject: entry.subject,
+            sectionId: entry.sectionId,
+            teacherId: entry.teacherId,
+            dayOfWeek: entry.day || 'Monday',
+            date: entry.date || '',
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+        });
+        setSchedType(entry.date ? 'date' : 'weekly');
+        setEditMode(true);
+        setShowModal(true);
     };
 
     const getFilteredTimetable = () => {
@@ -146,11 +176,17 @@ export default function TimetablePage() {
                         {showTodayOnly ? 'Active Today' : 'Show All'}
                     </button>
                     <button
-                        onClick={() => setShowModal(true)}
-                        className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
-                    >
-                        <Plus size={20} /> Create
-                    </button>
+                    onClick={() => {
+                        setEditMode(false);
+                        setSelectedId(null);
+                        setFormData({ subject: '', sectionId: '', teacherId: '', dayOfWeek: 'Monday', date: '', startTime: '', endTime: '' });
+                        setSchedType('weekly');
+                        setShowModal(true);
+                    }}
+                    className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 font-bold text-sm"
+                >
+                    <Plus size={20} /> Create
+                </button>
                 </div>
             </header>
 
@@ -219,13 +255,20 @@ export default function TimetablePage() {
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-right">
-                                        <div className="flex justify-end gap-2  group-hover:opacity-100 transition-opacity">
+                                        <div className="flex justify-end gap-3 group-hover:opacity-100 transition-all">
+                                            <button
+                                                onClick={() => handleEdit(entry)}
+                                                className="p-2.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm border border-indigo-100"
+                                                title="Edit Schedule"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
                                             <button
                                                 onClick={() => handleDelete(entry.id, entry.subject)}
-                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                className="p-2.5 text-rose-500 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm border border-rose-100"
                                                 title="Delete Schedule"
                                             >
-                                                <Trash2 size={18} />
+                                                <Trash2 size={16} />
                                             </button>
                                         </div>
                                     </td>
@@ -256,12 +299,20 @@ export default function TimetablePage() {
                                         <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">{entry.sectionName}</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDelete(entry.id, entry.subject)}
-                                    className="p-2 text-rose-500 bg-rose-50 rounded-xl active:bg-rose-100 transition-colors"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleEdit(entry)}
+                                        className="p-2 text-indigo-600 bg-indigo-50 rounded-xl active:bg-indigo-100 transition-colors"
+                                    >
+                                        <Edit2 size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(entry.id, entry.subject)}
+                                        className="p-2 text-rose-500 bg-rose-50 rounded-xl active:bg-rose-100 transition-colors"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 pt-2">
@@ -292,8 +343,8 @@ export default function TimetablePage() {
                         <div className="p-6 md:p-10">
                             <div className="flex justify-between items-start mb-6 md:mb-8">
                                 <div>
-                                    <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Create Schedule</h2>
-                                    <p className="text-slate-400 text-sm font-medium mt-1">Define mandatory subject hours and teacher links.</p>
+                                    <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{editMode ? 'Edit Schedule' : 'Create Schedule'}</h2>
+                                    <p className="text-slate-400 text-sm font-medium mt-1">{editMode ? 'Update existing timetable entry.' : 'Define mandatory subject hours and teacher links.'}</p>
                                 </div>
                                 <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
                                     <X size={24} />
@@ -427,7 +478,7 @@ export default function TimetablePage() {
                                         disabled={submitting}
                                         className="order-1 sm:order-2 flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all flex items-center justify-center gap-2"
                                     >
-                                        {submitting ? <Loader2 className="animate-spin" size={20} /> : "Finalize Schedule Entry"}
+                                        {submitting ? <Loader2 className="animate-spin" size={20} /> : (editMode ? "Update Schedule" : "Finalize Schedule Entry")}
                                     </button>
                                 </div>
                             </form>

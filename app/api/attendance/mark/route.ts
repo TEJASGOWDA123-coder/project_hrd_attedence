@@ -6,15 +6,47 @@ import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
     try {
-        const { code, usn } = await request.json();
+        const { code, token, usn, lat, lng } = await request.json();
 
-        // 1. Verify Code
+        function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+            const R = 6371e3; // meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // in meters
+        }
+
+        // 1. Verify Code, Activity, and Token (Allow current or previous)
         const session = await db.query.qrCodes.findFirst({
-            where: and(eq(qrCodes.code, code), eq(qrCodes.isActive, true))
+            where: and(
+                eq(qrCodes.code, code), 
+                eq(qrCodes.isActive, true)
+            )
         });
 
-        if (!session) {
+        if (!session || (session.rotatingToken !== token && session.previousToken !== token)) {
             return NextResponse.json({ error: 'Invalid or expired QR code.' }, { status: 400 });
+        }
+
+        // 1.2 Geolocation Check (if enabled for this session)
+        if (session.latitude && session.longitude) {
+            if (!lat || !lng) {
+                return NextResponse.json({ error: 'Location access is required for this session. Please enable GPS and try again.' }, { status: 403 });
+            }
+
+            const distance = getDistance(session.latitude, session.longitude, lat, lng);
+            const radius = session.radius || 100;
+
+            if (distance > radius) {
+                return NextResponse.json({ error: `You are too far from the classroom (${Math.round(distance)}m). Attendance denied.` }, { status: 403 });
+            }
         }
 
         // 1.5 Check if Whitelist exists

@@ -6,9 +6,12 @@ import { ClipboardCheck, ArrowRight, Landmark, Users, CheckCircle2, Search } fro
 import { cn } from '@/lib/utils';
 
 interface ClassData {
+    timetableId: string;
     sectionId: string;
     sectionName: string | null;
     subject: string | null;
+    time?: string;
+    endTime?: string;
     status: 'completed' | 'pending';
 }
 
@@ -92,35 +95,37 @@ export default function TeacherAttendanceList({ assignedClasses }: { assignedCla
                                 </div>
 
                                 <div className="mb-2">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{cls.subject || 'No Subject'}</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{cls.subject || 'No Subject'} • {cls.time}</p>
                                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{cls.sectionName || 'Unknown Section'}</h3>
                                 </div>
                                 <p className="text-sm text-slate-400 font-medium mb-8">
                                     {isCompleted ? "Attendance already recorded for today." : "Ready for today's roll call session."}
                                 </p>
 
-                                {isCompleted ? (
-                                    <button
-                                        disabled
-                                        className="flex items-center justify-between w-full bg-emerald-100 text-emerald-700 p-5 rounded-2xl cursor-not-allowed opacity-70"
-                                    >
-                                        <span className="flex items-center gap-3 font-bold text-sm">
-                                            <CheckCircle2 size={18} />
-                                            Completed
-                                        </span>
-                                    </button>
-                                ) : (
-                                    <Link
-                                        href={`/teacher/attendance/${cls.sectionId}?subject=${encodeURIComponent(cls.subject || '')}`}
-                                        className="flex items-center justify-between w-full bg-slate-900 text-white p-5 rounded-2xl hover:bg-purple-600 transition-all group-hover:shadow-xl group-hover:shadow-purple-200"
-                                    >
-                                        <span className="flex items-center gap-3 font-bold text-sm">
-                                            <ClipboardCheck size={18} />
-                                            Mark Now
-                                        </span>
-                                        <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-                                    </Link>
-                                )}
+                                <Link
+                                    href={`/teacher/attendance/${cls.sectionId}?subject=${encodeURIComponent(cls.subject || '')}&timetableId=${cls.timetableId}&endTime=${cls.endTime?.split(' - ')[1] || ''}`}
+                                    className={cn(
+                                        "flex items-center justify-between w-full p-5 rounded-2xl transition-all",
+                                        cls.status === 'completed'
+                                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                            : "bg-slate-900 text-white hover:bg-purple-600 group-hover:shadow-xl group-hover:shadow-purple-200"
+                                    )}
+                                >
+                                    <span className="flex items-center gap-3 font-bold text-sm">
+                                        {cls.status === 'completed' ? (
+                                            <>
+                                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                                Session Recorded - Edit Now
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                                                Start Attendance Session
+                                            </>
+                                        )}
+                                    </span>
+                                    <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+                                </Link>
                             </div>
                         </div>
                     );

@@ -14,28 +14,32 @@ export default async function TeacherAttendanceSelection() {
 
     if (!teacher) return <div>Teacher profile not found.</div>;
 
-    // Get unique section+subject combinations assigned to this teacher
-    const assignedClasses = await db.selectDistinct({
+    // Get classes assigned to this teacher
+    const assignedClasses = await db.select({
+        timetableId: timetable.id,
         sectionId: sections.id,
         sectionName: sections.name,
         subject: timetable.subject,
+        dayOfWeek: timetable.dayOfWeek,
+        date: timetable.date,
+        startTime: timetable.startTime,
+        endTime: timetable.endTime,
     })
         .from(timetable)
         .where(eq(timetable.teacherId, teacher.id))
         .leftJoin(sections, eq(timetable.sectionId, sections.id));
 
-    // Check for today's attendance
-    // Use timezone offset to ensure correct 'local' date for the server/db
-    // For simplicity, we'll use the server's local date or assume usage pattern. 
-    // Ideally, pass client timezone or standardise on UTC. 
-    // Here we use simple YYYY-MM-DD based on server time.
-    const today = new Date();
-    // Adjust to local time string 'YYYY-MM-DD'
-    const todayStr = today.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+    // Filter for classes scheduled for today (either by specific date or weekly day)
+    const todaysClasses = assignedClasses.filter(cls => {
+        if (cls.date) return cls.date === todayStr;
+        return cls.dayOfWeek === todayDayName;
+    });
 
     const todayAttendance = await db.select({
-        sectionId: attendance.sectionId,
-        subject: attendance.subject,
+        timetableId: attendance.timetableId,
     })
     .from(attendance)
     .where(and(
@@ -43,21 +47,15 @@ export default async function TeacherAttendanceSelection() {
         eq(attendance.date, todayStr)
     ));
 
-    const getStatus = (cls: any): 'completed' | 'pending' => {
-        const isCompleted = todayAttendance.some(
-            a => a.sectionId === cls.sectionId && a.subject === cls.subject
-        );
-        return isCompleted ? 'completed' : 'pending';
-    };
-
-    const dataList = assignedClasses
-        .filter(cls => cls.sectionId !== null && cls.subject !== null)
-        .map(cls => ({
-            sectionId: cls.sectionId as string,
-            sectionName: cls.sectionName,
-            subject: cls.subject as string,
-            status: getStatus(cls)
-        }));
+    const dataList = todaysClasses.map(cls => ({
+        timetableId: cls.timetableId,
+        sectionId: cls.sectionId as string,
+        sectionName: cls.sectionName,
+        subject: cls.subject as string,
+        time: `${cls.startTime} - ${cls.endTime}`,
+        endTime: cls.endTime as string,
+        status: todayAttendance.some(a => a.timetableId === cls.timetableId) ? 'completed' as const : 'pending' as const
+    }));
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">

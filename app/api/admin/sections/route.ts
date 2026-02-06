@@ -48,3 +48,14 @@ export async function DELETE(request: Request) {
     await db.delete(sections).where(eq(sections.id, id));
     return NextResponse.json({ success: true });
 }
+export async function PATCH(request: Request) {
+    const { id, name } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+
+    try {
+        await db.update(sections).set({ name }).where(eq(sections.id, id));
+        return NextResponse.json({ success: true });
+    } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+}

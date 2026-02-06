@@ -13,7 +13,10 @@ export default function QRAttendancePage() {
     const [activeSession, setActiveSession] = useState(false);
     const [attendedStudents, setAttendedStudents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [rotatingToken, setRotatingToken] = useState('');
     const [allowedStudents, setAllowedStudents] = useState<string[]>([]);
+    const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
+    const [useLocation, setUseLocation] = useState(false);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -34,6 +37,7 @@ export default function QRAttendancePage() {
             }).filter(Boolean).map(String);
 
             setAllowedStudents(usns);
+            console.log('Loaded USNs from Excel:', usns);
             alert(`Loaded ${usns.length} students from Excel`);
         };
         reader.readAsBinaryString(file);
@@ -54,6 +58,9 @@ export default function QRAttendancePage() {
                 }
 
                 if (data.isActive) {
+                    if (data.rotatingToken) {
+                        setRotatingToken(data.rotatingToken);
+                    }
                     if (!activeSession) {
                         setSessionCode(data.code);
                         setSubject(data.subject);
@@ -81,6 +88,25 @@ export default function QRAttendancePage() {
         return () => clearInterval(interval);
     }, [activeSession, sessionCode]);
 
+    const toggleLocation = () => {
+        if (!useLocation) {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                    setUseLocation(true);
+                }, (err) => {
+                    alert("Location access denied. QR code will not have proximity lock.");
+                    setUseLocation(false);
+                });
+            } else {
+                alert("Geolocation not supported by your browser.");
+            }
+        } else {
+            setUseLocation(false);
+            setLocation(null);
+        }
+    };
+
     const handleCreate = async () => {
         if (!subject) return alert('Please enter an Event Name');
         if (allowedStudents.length === 0) return alert('Please upload an Excel list first');
@@ -90,7 +116,10 @@ export default function QRAttendancePage() {
             const payload = {
                 sectionId: null,
                 subject,
-                allowedStudents: allowedStudents
+                allowedStudents: allowedStudents,
+                latitude: location?.lat,
+                longitude: location?.lng,
+                radius: 100
             };
 
             const res = await fetch('/api/admin/qr/create', {
@@ -143,7 +172,7 @@ export default function QRAttendancePage() {
         document.body.removeChild(link);
     };
 
-    const attendanceUrl = typeof window !== 'undefined' ? `${window.location.origin}/attendance/mark?code=${sessionCode}` : '';
+    const attendanceUrl = typeof window !== 'undefined' ? `${window.location.origin}/attendance/mark?code=${sessionCode}&token=${rotatingToken}` : '';
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-10">
@@ -182,6 +211,22 @@ export default function QRAttendancePage() {
                                 value={subject}
                                 onChange={e => setSubject(e.target.value)}
                             />
+                        </div>
+
+                        <div className="flex items-center justify-between px-5 py-3 bg-slate-50 rounded-2xl border border-slate-200">
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location Security</p>
+                                <p className="text-xs font-bold text-slate-600">{useLocation ? "✓ GPS Lock Active (100m)" : "No proximity restriction"}</p>
+                            </div>
+                            <button 
+                                onClick={toggleLocation}
+                                className={cn(
+                                    "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                                    useLocation ? "bg-emerald-100 text-emerald-600" : "bg-slate-200 text-slate-500 hover:bg-slate-300"
+                                )}
+                            >
+                                {useLocation ? "Locked" : "Lock GPS"}
+                            </button>
                         </div>
                         <button
                             onClick={handleCreate}

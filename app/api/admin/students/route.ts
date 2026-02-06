@@ -13,10 +13,8 @@ export async function GET(request: Request) {
             id: students.id,
             usn: students.usn,
             name: students.name,
-            email: students.email,
             batch: students.batch,
             year: students.year,
-            phone: students.phone,
             sectionId: students.sectionId,
             sectionName: sections.name,
             // Subqueries for attendance stats
@@ -45,11 +43,18 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const { usn, name, email, batch, year, phone, sectionId } = await request.json();
+    const { usn, name, batch, year, sectionId } = await request.json();
     const id = Math.random().toString(36).substring(2, 11);
 
     try {
-        await db.insert(students).values({ id, usn, name, email, batch, year, phone, sectionId });
+        await db.insert(students).values({ 
+            id, 
+            usn, 
+            name, 
+            batch: batch || null, 
+            year: year || null, 
+            sectionId 
+        });
         return NextResponse.json({ success: true });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 400 });

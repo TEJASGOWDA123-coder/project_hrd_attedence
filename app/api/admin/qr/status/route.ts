@@ -26,6 +26,24 @@ export async function GET(request: Request) {
 
         if (!session) return NextResponse.json({ isActive: false, students: [] });
 
+        // Token Rotation Logic (every 30 seconds)
+        const now = new Date();
+        const lastUpdate = session.tokenUpdatedAt ? new Date(session.tokenUpdatedAt) : new Date(0);
+        const diffSeconds = (now.getTime() - lastUpdate.getTime()) / 1000;
+
+        let currentToken = session.rotatingToken;
+        if (diffSeconds > 5 && session.isActive) {
+            const nextToken = Math.random().toString(36).substring(2, 10);
+            await db.update(qrCodes)
+                .set({ 
+                    previousToken: currentToken,
+                    rotatingToken: nextToken, 
+                    tokenUpdatedAt: now.toISOString() 
+                })
+                .where(eq(qrCodes.id, session.id));
+            currentToken = nextToken;
+        }
+
         const today = new Date().toISOString().split('T')[0];
 
         // Fetch attendance for this session's context (Date + Subject + Section)
@@ -48,6 +66,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ 
             isActive: session.isActive,
             code: session.code,
+            rotatingToken: currentToken,
             subject: session.subject,
             students: presentStudents 
         });

@@ -11,8 +11,9 @@ export default function StudentsPage() {
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
-    const [formData, setFormData] = useState({ usn: '', name: '', email: '', batch: '', year: '', phone: '', sectionId: '' });
+    const [formData, setFormData] = useState({ usn: '', name: '', batch: '', year: '', sectionId: '' });
     const [submitting, setSubmitting] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     // Bulk States
     const [bulkData, setBulkData] = useState<any[]>([]);
@@ -59,7 +60,7 @@ export default function StudentsPage() {
         });
         if (res.ok) {
             setShowModal(false);
-            setFormData({ usn: '', name: '', email: '', batch: '', year: '', phone: '', sectionId: '' });
+            setFormData({ usn: '', name: '', batch: '', year: '', sectionId: '' });
             fetchData();
         } else {
             const err = await res.json();
@@ -117,16 +118,13 @@ export default function StudentsPage() {
         const batchIdx = headers.indexOf('batch');
         const sectionIdx = headers.indexOf('section');
         const yearIdx = headers.indexOf('year');
-        const numberIdx = headers.indexOf('number'); // maps to phone
-        const emailIdx = headers.indexOf('email');
 
-        if (usnIdx === -1 || nameIdx === -1 || emailIdx === -1 || sectionIdx === -1) {
+        if (usnIdx === -1 || nameIdx === -1 || sectionIdx === -1) {
             const missing = [];
             if (usnIdx === -1) missing.push('usn');
             if (nameIdx === -1) missing.push('name');
-            if (emailIdx === -1) missing.push('email');
             if (sectionIdx === -1) missing.push('section');
-            setBulkErrors([`Invalid CSV headers. Missing: ${missing.join(', ')}. Required: usn, name, batch, section, year, number, email`]);
+            setBulkErrors([`Invalid CSV headers. Missing: ${missing.join(', ')}. Required at minimum: usn, name, section`]);
             return;
         }
 
@@ -138,16 +136,12 @@ export default function StudentsPage() {
             const cols = line.split(',').map(c => c.trim());
             const usn = cols[usnIdx];
             const name = cols[nameIdx];
-            const email = cols[emailIdx];
             const batch = batchIdx !== -1 ? cols[batchIdx] : '';
             const sectionValue = cols[sectionIdx];
             const year = yearIdx !== -1 ? cols[yearIdx] : '';
-            const phone = numberIdx !== -1 ? cols[numberIdx] : '';
 
-            if (!usn || !name || !email || !sectionValue) {
-                errors.push(`Row ${i + 2}: Missing required fields (USN, Name, Email, or Section).`);
-            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                errors.push(`Row ${i + 2}: Invalid email format (${email}).`);
+            if (!usn || !name || !sectionValue) {
+                errors.push(`Row ${i + 2}: Missing required fields (USN, Name, or Section).`);
             } else {
                 // Fuzzy/Prefix Matching Logic
                 const normalizedSearch = sectionValue.toLowerCase();
@@ -170,26 +164,25 @@ export default function StudentsPage() {
                     errors.push(`Row ${i + 2}: Section "${sectionValue}" not found. Available: ${availableSections.join(', ')}`);
                 } else {
                     parsed.push({
-                        usn,
+                        usn: usn.toUpperCase(),
                         name,
-                        email,
                         batch,
                         sectionName: matchedSection.name, // Use the actual DB name
-                        year,
-                        phone
+                        year
                     });
                 }
             }
         });
 
+        console.log('Parsed Bulk Data:', parsed);
         setBulkData(parsed);
         setBulkErrors(errors);
         setBulkPhase('preview');
     };
 
     const downloadSample = () => {
-        // Headers: usn,name,batch,section,year,number,email
-        const csvContent = "data:text/csv;charset=utf-8,usn,name,batch,section,year,number,email\n1RV22MC001,Venk,2024-2026,MCA A,1,9886655443,venky@gmail.com\n1RV22MC002,Tejas,2024-2026,MCA A,1,9886655444,tejas@gmail.com";
+        // Headers: usn,name,section,batch,year
+        const csvContent = "data:text/csv;charset=utf-8,usn,name,section,batch,year\n1NH22MC001,Venk,MCA A,2024-2026,1\n1NH22MC002,Tejas,MCA A,2024-2026,1";
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -199,10 +192,29 @@ export default function StudentsPage() {
         document.body.removeChild(link);
     };
 
-    const handleDelete = async (id: string, name: string) => {
-        if (confirm(`Unenroll ${name}? All attendance data for this student will be archived.`)) {
-            await fetch(`/api/admin/students?id=${id}`, { method: 'DELETE' });
-            fetchData();
+    const handleDelete = async (id: string, name?: string) => {
+        if (confirm(name ? `Unenroll ${name}? All attendance data for this student will be archived.` : `Delete ${selectedIds.length} selected students?`)) {
+            const res = await fetch(id === 'bulk' ? '/api/admin/students/bulk' : `/api/admin/students?id=${id}`, { 
+                method: 'DELETE',
+                headers: id === 'bulk' ? { 'Content-Type': 'application/json' } : {},
+                body: id === 'bulk' ? JSON.stringify({ ids: selectedIds }) : null
+            });
+            if (res.ok) {
+                setSelectedIds([]);
+                fetchData();
+            }
+        }
+    };
+
+    const handleBulkDeleteByFilter = async () => {
+        if (!selectedSection && !confirm('No section selected. This will delete students based on active filters. Proceed?')) return;
+        if (confirm(`Delete ALL students matching active filters?`)) {
+            const res = await fetch('/api/admin/students/bulk', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sectionId: selectedSection })
+            });
+            if (res.ok) fetchData();
         }
     };
 
@@ -210,7 +222,6 @@ export default function StudentsPage() {
 
     const filteredStudents = students.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-            s.email.toLowerCase().includes(search.toLowerCase()) ||
             s.usn.toLowerCase().includes(search.toLowerCase());
         const matchesSection = selectedSection ? s.sectionId === selectedSection : true;
         return matchesSearch && matchesSection;
@@ -224,6 +235,14 @@ export default function StudentsPage() {
                     <p className="text-slate-500 mt-1">Enrollment and academic tracking portal.</p>
                 </div>
                 <div className="flex gap-4">
+                    {selectedIds.length > 0 && (
+                        <button
+                            onClick={() => handleDelete('bulk')}
+                            className="bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-rose-100 border border-rose-200 shadow-sm transition-all active:scale-95 font-bold text-sm animate-in zoom-in-95"
+                        >
+                            <Trash2 size={20} /> Delete Selected ({selectedIds.length})
+                        </button>
+                    )}
                     <button
                         onClick={() => {
                             setBulkPhase('upload');
@@ -251,7 +270,7 @@ export default function StudentsPage() {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
                                 type="text"
-                                placeholder="Search by name, USN, or email..."
+                                placeholder="Search by name or USN..."
                                 className="pl-12 pr-4 py-3 w-full bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -275,10 +294,23 @@ export default function StudentsPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-slate-50">
+                            <tr className="border-b border-slate-100">
+                                <th className="px-8 py-5 text-left">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                        checked={selectedIds.length > 0 && selectedIds.length === filteredStudents.length}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setSelectedIds(filteredStudents.map(s => s.id));
+                                            } else {
+                                                setSelectedIds([]);
+                                            }
+                                        }}
+                                    />
+                                </th>
                                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student Info</th>
                                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Acedemic Details</th>
-                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact</th>
                                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Settings</th>
                             </tr>
                         </thead>
@@ -299,7 +331,21 @@ export default function StudentsPage() {
                                     </td>
                                 </tr>
                             ) : filteredStudents.map((student) => (
-                                <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <tr key={student.id} className={cn("hover:bg-slate-50/50 transition-colors group", selectedIds.includes(student.id) && "bg-indigo-50/30")}>
+                                    <td className="px-8 py-5">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                            checked={selectedIds.includes(student.id)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedIds([...selectedIds, student.id]);
+                                                } else {
+                                                    setSelectedIds(selectedIds.filter(id => id !== student.id));
+                                                }
+                                            }}
+                                        />
+                                    </td>
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-full border-2 border-indigo-100 p-0.5 group-hover:border-indigo-600 transition-colors overflow-hidden">
@@ -322,20 +368,6 @@ export default function StudentsPage() {
                                                 <span className="w-1 h-1 bg-slate-300 rounded-full" />
                                                 <span className="text-[10px] font-black uppercase tracking-widest">Year {student.year || 'N/A'}</span>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-5">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 text-slate-600">
-                                                <Mail size={12} className="text-slate-400" />
-                                                <span className="text-xs font-bold">{student.email}</span>
-                                            </div>
-                                            {student.phone && (
-                                                <div className="flex items-center gap-2 text-slate-400">
-                                                    <Phone size={12} />
-                                                    <span className="text-[10px] font-medium">{student.phone}</span>
-                                                </div>
-                                            )}
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-right">
@@ -375,7 +407,7 @@ export default function StudentsPage() {
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Student USN</label>
                                         <div className="relative">
                                             <IdCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                            <input required placeholder="1RV22MC000" className="w-full pl-12 pr-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.usn} onChange={(e) => setFormData({ ...formData, usn: e.target.value })} />
+                                            <input required placeholder="1NH22MC000" className="w-full pl-12 pr-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.usn} onChange={(e) => setFormData({ ...formData, usn: e.target.value })} />
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
@@ -386,17 +418,6 @@ export default function StudentsPage() {
 
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Email</label>
-                                        <input required type="email" placeholder="charlie@student.ams.edu" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Phone Number</label>
-                                        <input placeholder="9886655443" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-6">
-                                    <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Batch</label>
                                         <input placeholder="2024-2026" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.batch} onChange={(e) => setFormData({ ...formData, batch: e.target.value })} />
                                     </div>
@@ -404,13 +425,14 @@ export default function StudentsPage() {
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Year</label>
                                         <input placeholder="1" className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900" value={formData.year} onChange={(e) => setFormData({ ...formData, year: e.target.value })} />
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Section</label>
-                                        <select className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 cursor-pointer appearance-none" value={formData.sectionId} onChange={(e) => setFormData({ ...formData, sectionId: e.target.value })}>
-                                            <option value="">Select...</option>
-                                            {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                        </select>
-                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Section</label>
+                                    <select className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 cursor-pointer appearance-none" value={formData.sectionId} onChange={(e) => setFormData({ ...formData, sectionId: e.target.value })}>
+                                        <option value="">Select...</option>
+                                        {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
                                 </div>
 
                                 <div className="flex gap-4 mt-6">
@@ -450,7 +472,7 @@ export default function StudentsPage() {
                                         <h4 className="text-xl font-black text-slate-900">Push CSV Source</h4>
                                         <p className="text-slate-400 text-sm mt-1 font-medium">Click or drag your enrollment data sheet here.</p>
                                         <div className="mt-4 flex flex-wrap justify-center gap-2">
-                                            {['USN', 'Name', 'Batch', 'Section', 'Year', 'Number', 'Email'].map(field => (
+                                            {['USN', 'Name', 'Batch', 'Section', 'Year'].map(field => (
                                                 <span key={field} className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest">{field}</span>
                                             ))}
                                         </div>
@@ -499,7 +521,6 @@ export default function StudentsPage() {
                                                     <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">USN</th>
                                                     <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">Student</th>
                                                     <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">Academic</th>
-                                                    <th className="px-6 py-4 text-left font-black text-slate-400 uppercase tracking-widest">Contact</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
@@ -512,10 +533,6 @@ export default function StudentsPage() {
                                                                 <span className="font-black text-indigo-600 uppercase tracking-tighter">{row.sectionName}</span>
                                                                 <span className="text-[10px] text-slate-400 font-medium">{row.batch}</span>
                                                             </div>
-                                                        </td>
-                                                        <td className="px-6 py-3 space-y-0.5">
-                                                            <p className="text-slate-500">{row.email}</p>
-                                                            <p className="text-[10px] text-slate-400">{row.phone}</p>
                                                         </td>
                                                     </tr>
                                                 ))}

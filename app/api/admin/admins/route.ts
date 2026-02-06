@@ -55,3 +55,54 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+export async function PATCH(request: Request) {
+    try {
+        const { id, name, email, password } = await request.json();
+
+        if (!id) {
+            return NextResponse.json({ error: 'Admin ID required' }, { status: 400 });
+        }
+
+        const updateData: any = {};
+        if (name) updateData.name = name;
+        if (email) updateData.email = email;
+        if (password && password.trim() !== '') {
+            updateData.passwordHash = await bcrypt.hash(password, 10);
+        }
+
+        await db.update(users)
+            .set(updateData)
+            .where(eq(users.id, id));
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get('id');
+
+        if (!id) {
+            return NextResponse.json({ error: 'Admin ID required' }, { status: 400 });
+        }
+
+        // Optional: Check if it's the last admin
+        const adminCount = await db.query.users.findMany({
+            where: eq(users.role, 'admin'),
+        });
+
+        if (adminCount.length <= 1) {
+            return NextResponse.json({ error: 'Cannot delete the last administrator' }, { status: 400 });
+        }
+
+        await db.delete(users).where(eq(users.id, id));
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

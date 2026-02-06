@@ -8,6 +8,9 @@ export async function GET(request: Request) {
     const sectionId = searchParams.get('sectionId');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const startTime = searchParams.get('startTime');
+    const endTime = searchParams.get('endTime');
+    const timezoneOffset = searchParams.get('timezoneOffset'); // in minutes, from client
     const subject = searchParams.get('subject');
 
     let query = db.select({
@@ -33,6 +36,22 @@ export async function GET(request: Request) {
     }
     if (endDate && endDate !== '') {
         filters.push(sql`${attendance.date} <= ${endDate}`);
+    }
+
+    // Time range filtering (SQLite specific, handles UTC to Local conversion using provided offset)
+    if (startTime && startTime !== '' && timezoneOffset) {
+        const offsetMinutes = -parseInt(timezoneOffset);
+        const sign = offsetMinutes >= 0 ? '+' : '-';
+        const absMinutes = Math.abs(offsetMinutes);
+        const offsetString = `${sign}${absMinutes} minutes`;
+        filters.push(sql`strftime('%H:%M', ${attendance.createdAt}, ${offsetString}) >= ${startTime}`);
+    }
+    if (endTime && endTime !== '' && timezoneOffset) {
+        const offsetMinutes = -parseInt(timezoneOffset);
+        const sign = offsetMinutes >= 0 ? '+' : '-';
+        const absMinutes = Math.abs(offsetMinutes);
+        const offsetString = `${sign}${absMinutes} minutes`;
+        filters.push(sql`strftime('%H:%M', ${attendance.createdAt}, ${offsetString}) <= ${endTime}`);
     }
 
     if (subject && subject !== '') {

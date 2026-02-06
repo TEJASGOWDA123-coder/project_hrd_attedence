@@ -35,6 +35,7 @@ export async function POST(request: Request) {
                 // Update existing record
                 await db.update(attendance)
                     .set({
+                        teacherId: teacher.id, // Ensure current teacher is attributed
                         status: status as any,
                         isDraft: isDraft || false,
                         updatedAt: sql`CURRENT_TIMESTAMP`

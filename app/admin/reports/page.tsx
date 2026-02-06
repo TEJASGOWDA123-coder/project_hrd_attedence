@@ -8,7 +8,7 @@ export default function ReportsPage() {
     const [reports, setReports] = useState<any[]>([]);
     const [sections, setSections] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [filter, setFilter] = useState({ sectionId: '', startDate: '', endDate: '', subject: '' });
+    const [filter, setFilter] = useState({ sectionId: '', startDate: '', endDate: '', startTime: '', endTime: '', subject: '' });
 
     const fetchSections = async () => {
         const res = await fetch('/api/admin/sections');
@@ -23,7 +23,10 @@ export default function ReportsPage() {
         if (filter.sectionId) params.append('sectionId', filter.sectionId);
         if (filter.startDate) params.append('startDate', filter.startDate);
         if (filter.endDate) params.append('endDate', filter.endDate);
+        if (filter.startTime) params.append('startTime', filter.startTime);
+        if (filter.endTime) params.append('endTime', filter.endTime);
         if (filter.subject) params.append('subject', filter.subject);
+        params.append('timezoneOffset', new Date().getTimezoneOffset().toString());
 
         const res = await fetch(`/api/admin/reports?${params.toString()}`);
         const data = await res.json();
@@ -83,55 +86,76 @@ export default function ReportsPage() {
             </header>
 
 
-            <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-100/50 flex flex-col md:flex-row flex-wrap gap-4 md:gap-8 items-end">
-                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Target Section</label>
-                    <div className="relative">
+            <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-100/50 flex flex-col flex-wrap gap-4 md:gap-8 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full items-end">
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Section</label>
                         <select
-                            className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900 appearance-none cursor-pointer"
                             value={filter.sectionId}
                             onChange={(e) => setFilter({ ...filter, sectionId: e.target.value })}
                         >
-                            <option value="">Consolidated (All)</option>
+                            <option value="">All</option>
                             {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                     </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Date</label>
+                        <input
+                            type="date"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                            value={filter.startDate}
+                            onChange={(e) => setFilter({ ...filter, startDate: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">End Date</label>
+                        <input
+                            type="date"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                            value={filter.endDate}
+                            onChange={(e) => setFilter({ ...filter, endDate: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Time</label>
+                        <input
+                            type="time"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                            value={filter.startTime}
+                            onChange={(e) => setFilter({ ...filter, startTime: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">End Time</label>
+                        <input
+                            type="time"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                            value={filter.endTime}
+                            onChange={(e) => setFilter({ ...filter, endTime: e.target.value })}
+                        />
+                    </div>
                 </div>
-                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Date</label>
-                    <input
-                        type="date"
-                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
-                        value={filter.startDate}
-                        onChange={(e) => setFilter({ ...filter, startDate: e.target.value })}
-                    />
+
+                <div className="flex flex-col md:flex-row gap-4 w-full items-end mt-4">
+                    <div className="flex-1 space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Subject Filter</label>
+                        <input
+                            type="text"
+                            placeholder="e.g., Mathematics"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
+                            value={filter.subject}
+                            onChange={(e) => setFilter({ ...filter, subject: e.target.value })}
+                        />
+                    </div>
+                    <button
+                        onClick={fetchReports}
+                        className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 group h-[50px] min-w-[200px]"
+                    >
+                        <Filter size={18} className="group-hover:rotate-12 transition-transform" />
+                        Generate Report
+                    </button>
                 </div>
-                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">End Date</label>
-                    <input
-                        type="date"
-                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
-                        value={filter.endDate}
-                        onChange={(e) => setFilter({ ...filter, endDate: e.target.value })}
-                    />
-                </div>
-                <div className="w-full md:flex-1 min-w-[200px] space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Subject Filter</label>
-                    <input
-                        type="text"
-                        placeholder="e.g., Mathematics"
-                        className="w-full px-5 py-4 bg-white border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 outline-none transition-all text-sm font-bold text-slate-900"
-                        value={filter.subject}
-                        onChange={(e) => setFilter({ ...filter, subject: e.target.value })}
-                    />
-                </div>
-                <button
-                    onClick={fetchReports}
-                    className="w-full md:w-auto bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 group h-[58px]"
-                >
-                    <Filter size={18} className="group-hover:rotate-12 transition-transform" />
-                    Generate Report
-                </button>
             </div>
 
             {/* Admin Intelligence Summary */}

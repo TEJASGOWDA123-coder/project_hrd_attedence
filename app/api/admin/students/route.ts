@@ -17,7 +17,8 @@ export async function GET(request: Request) {
             year: students.year,
             sectionId: students.sectionId,
             sectionName: sections.name,
-            // Subqueries for attendance stats
+            attendancePercentage: students.attendancePercentage,
+            // Subqueries for basic stats (informational)
             totalSessions: sql<number>`(SELECT COUNT(*) FROM attendance WHERE student_id = ${students.id})`,
             presentSessions: sql<number>`(SELECT COUNT(*) FROM attendance WHERE student_id = ${students.id} AND status = 'present')`,
         })
@@ -25,17 +26,7 @@ export async function GET(request: Request) {
             .leftJoin(sections, eq(students.sectionId, sections.id))
             .where(sectionId ? eq(students.sectionId, sectionId) : undefined);
 
-        // Calculate percentage for each student
-        const studentsWithStats = data.map(s => {
-            const total = Number(s.totalSessions || 0);
-            const present = Number(s.presentSessions || 0);
-            return {
-                ...s,
-                attendancePercentage: total > 0 ? Math.round((present / total) * 100) : null
-            };
-        });
-
-        return NextResponse.json(studentsWithStats);
+        return NextResponse.json(data);
     } catch (err: any) {
         console.error('Error fetching students:', err);
         return NextResponse.json({ error: 'Failed to fetch students', details: err.message }, { status: 500 });

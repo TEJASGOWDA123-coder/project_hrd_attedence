@@ -86,6 +86,35 @@ export async function PATCH(request: Request) {
         await db.update(timetable)
             .set({ sectionId, teacherId, subject, dayOfWeek, date, startTime, endTime })
             .where(eq(timetable.id, id));
+
+        // Get teacher email and send notification
+        const teacher = await db.query.teachers.findFirst({
+            where: eq(teachers.id, teacherId)
+        });
+
+        if (teacher) {
+            const teacherUser = await db.query.users.findFirst({
+                where: eq(users.id, teacher.userId)
+            });
+
+            if (teacherUser && teacherUser.email) {
+                const { sendEmail } = await import('@/lib/email');
+                await sendEmail({
+                    to: teacherUser.email,
+                    subject: `📅 Schedule Updated: ${subject}`,
+                    text: `Hello ${teacherUser.name}, your class schedule for ${subject} on ${dayOfWeek} at ${startTime} has been updated.`,
+                    html: `<h3>Schedule Updated</h3>
+                           <p>Hello <b>${teacherUser.name}</b>,</p>
+                           <p>Your class schedule has been updated:</p>
+                           <ul>
+                             <li><b>Subject:</b> ${subject}</li>
+                             <li><b>Day:</b> ${dayOfWeek}</li>
+                             <li><b>Time:</b> ${startTime} - ${endTime}</li>
+                           </ul>`
+                }).catch(err => console.error('Failed to send update schedule email:', err));
+            }
+        }
+
         return NextResponse.json({ success: true });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 400 });

@@ -45,9 +45,9 @@ async function seed() {
 
     // Create Students
     await db.insert(students).values([
-        { id: id(), usn: 'STU001', name: 'Alice Smith', email: 'alice@example.com', sectionId: sectionA, batch: '2024-2026', year: '1', phone: '1234567890' },
-        { id: id(), usn: 'STU002', name: 'Bob Johnson', email: 'bob@example.com', sectionId: sectionA, batch: '2024-2026', year: '1', phone: '1234567891' },
-        { id: id(), usn: 'STU003', name: 'Charlie Brown', email: 'charlie@example.com', sectionId: sectionB, batch: '2024-2026', year: '1', phone: '1234567892' },
+        { id: id(), usn: 'STU001', name: 'Alice Smith', sectionId: sectionA, batch: '2024-2026', year: '1' },
+        { id: id(), usn: 'STU002', name: 'Bob Johnson', sectionId: sectionA, batch: '2024-2026', year: '1' },
+        { id: id(), usn: 'STU003', name: 'Charlie Brown', sectionId: sectionB, batch: '2024-2026', year: '1' },
     ]);
 
     console.log('Seed completed!');

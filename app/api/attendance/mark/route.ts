@@ -6,7 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
     try {
-        const { code, token, usn, lat, lng } = await request.json();
+        const { code, token, usn: rawUsn, lat, lng } = await request.json();
+        const usn = rawUsn?.toString().trim().toUpperCase();
 
         function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
             const R = 6371e3; // meters
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
         });
 
         if (!student) {
-            return NextResponse.json({ error: 'Student found with this USN.' }, { status: 404 });
+            return NextResponse.json({ error: 'No student found with this USN.' }, { status: 404 });
         }
 
         // 3. Mark Attendance

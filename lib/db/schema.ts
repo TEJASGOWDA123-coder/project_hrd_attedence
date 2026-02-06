@@ -21,8 +21,6 @@ export const students = sqliteTable('students', {
   id: text('id').primaryKey(),
   usn: text('usn').unique().notNull(),
   name: text('name').notNull(),
-  email: text('email'),
-  phone: text('phone'),
   batch: text('batch'),
   year: text('year'),
   sectionId: text('section_id').references(() => sections.id, { onDelete: 'set null' }),

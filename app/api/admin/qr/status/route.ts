@@ -32,7 +32,7 @@ export async function GET(request: Request) {
         const diffSeconds = (now.getTime() - lastUpdate.getTime()) / 1000;
 
         let currentToken = session.rotatingToken;
-        if (diffSeconds > 5 && session.isActive) {
+        if (diffSeconds > 30 && session.isActive) {
             const nextToken = Math.random().toString(36).substring(2, 10);
             await db.update(qrCodes)
                 .set({ 

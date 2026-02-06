@@ -47,9 +47,10 @@ export async function POST(request: Request) {
     const id = Math.random().toString(36).substring(2, 11);
 
     try {
+        const normalizedUsn = usn?.toString().trim().toUpperCase();
         await db.insert(students).values({ 
             id, 
-            usn, 
+            usn: normalizedUsn, 
             name, 
             batch: batch || null, 
             year: year || null, 

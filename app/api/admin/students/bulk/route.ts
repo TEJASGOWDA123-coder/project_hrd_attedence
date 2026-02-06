@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { students, sections } from '@/lib/db/schema';
-import { eq, inArray, and } from 'drizzle-orm';
+import { eq, inArray, and, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -30,7 +30,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No valid student data found in the uploaded list.' }, { status: 400 });
         }
 
-        await db.insert(students).values(toInsert);
+        await db.insert(students).values(toInsert).onConflictDoUpdate({
+            target: students.usn,
+            set: {
+                name: sql`excluded.name`,
+                batch: sql`excluded.batch`,
+                year: sql`excluded.year`,
+                sectionId: sql`excluded.section_id`,
+            }
+        });
 
         return NextResponse.json({
             success: true,

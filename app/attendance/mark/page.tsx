@@ -17,7 +17,8 @@ function AttendanceForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!usn || !code || !token) return;
+        const trimmedUsn = usn.trim();
+        if (!trimmedUsn || !code || !token) return;
 
         setStatus('loading');
         try {
@@ -38,7 +39,7 @@ function AttendanceForm() {
             const res = await fetch('/api/attendance/mark', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code, token, usn, lat, lng })
+                body: JSON.stringify({ code, token, usn: trimmedUsn, lat, lng })
             });
             const data = await res.json();
 

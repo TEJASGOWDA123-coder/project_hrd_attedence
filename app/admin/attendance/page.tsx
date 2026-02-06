@@ -18,6 +18,7 @@ async function getSummary() {
     const data = await db.select({
         sectionId: sections.id,
         sectionName: sections.name,
+        studentCount: sql<number>`(SELECT COUNT(*) FROM students WHERE section_id = ${sections.id})`,
         present: sql<number>`CAST(count(case when ${attendance.status} = 'present' then 1 end) AS INTEGER)`,
         absent: sql<number>`CAST(count(case when ${attendance.status} = 'absent' then 1 end) AS INTEGER)`,
         late: sql<number>`CAST(count(case when ${attendance.status} = 'late' then 1 end) AS INTEGER)`,
@@ -92,18 +93,30 @@ export default async function AdminAttendancePage() {
 
                                 <div className="space-y-2 mb-8">
                                     <div className="flex justify-between items-end">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Efficiency Rate</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Efficiency Rate</span>
+                                            <span className="text-[10px] font-bold text-slate-400 mt-1">{s.studentCount || 0} Total Students</span>
+                                        </div>
                                         <span className="text-sm font-black text-slate-900">{rate.toFixed(1)}%</span>
                                     </div>
                                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                        <div
-                                            className={cn(
-                                                "h-full transition-all duration-1000",
-                                                rate > 80 ? "bg-emerald-500" : rate > 50 ? "bg-amber-500" : "bg-rose-500"
-                                            )}
-                                            style={{ width: `${rate}%` }}
-                                        />
+                                        {total > 0 ? (
+                                            <div
+                                                className={cn(
+                                                    "h-full transition-all duration-1000",
+                                                    rate > 80 ? "bg-emerald-500" : rate > 50 ? "bg-amber-500" : "bg-rose-500"
+                                                )}
+                                                style={{ width: `${rate}%` }}
+                                            />
+                                        ) : (
+                                            <div className="h-full bg-slate-200 w-full opacity-20" />
+                                        )}
                                     </div>
+                                    {total === 0 && (
+                                        <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest text-center mt-2 animate-pulse">
+                                            Awaiting initial records
+                                        </p>
+                                    )}
                                 </div>
 
                                 <Link

@@ -22,8 +22,8 @@ async function getSummary() {
         absent: sql<number>`CAST(count(case when ${attendance.status} = 'absent' then 1 end) AS INTEGER)`,
         late: sql<number>`CAST(count(case when ${attendance.status} = 'late' then 1 end) AS INTEGER)`,
     })
-        .from(attendance)
-        .leftJoin(sections, eq(attendance.sectionId, sections.id))
+        .from(sections)
+        .leftJoin(attendance, eq(attendance.sectionId, sections.id))
         .groupBy(sections.id, sections.name);
 
     return data;

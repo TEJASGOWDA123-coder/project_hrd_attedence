@@ -2,6 +2,8 @@ import { db } from '@/lib/db';
 import { sections, students } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
+
 
 export async function GET() {
     try {
@@ -34,6 +36,8 @@ export async function POST(request: Request) {
 
     try {
         await db.insert(sections).values({ id, name });
+        revalidatePath('/admin/attendance');
+        revalidatePath('/admin/sections');
         return NextResponse.json({ success: true });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 400 });
@@ -46,6 +50,8 @@ export async function DELETE(request: Request) {
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
     await db.delete(sections).where(eq(sections.id, id));
+    revalidatePath('/admin/attendance');
+    revalidatePath('/admin/sections');
     return NextResponse.json({ success: true });
 }
 export async function PATCH(request: Request) {
@@ -54,6 +60,8 @@ export async function PATCH(request: Request) {
 
     try {
         await db.update(sections).set({ name }).where(eq(sections.id, id));
+        revalidatePath('/admin/attendance');
+        revalidatePath('/admin/sections');
         return NextResponse.json({ success: true });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 400 });

@@ -1,4 +1,6 @@
 import { db } from '@/lib/db';
+export const dynamic = 'force-dynamic';
+
 import { attendance, sections } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Search, Users, Mail, GraduationCap, X, Loader2, Landmark, FileUp, Download, AlertCircle, CheckCircle2, IdCard, Hash, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 export default function StudentsPage() {
     const [students, setStudents] = useState<any[]>([]);
@@ -97,34 +98,40 @@ export default function StudentsPage() {
 
         const reader = new FileReader();
         reader.onload = (event) => {
-            const text = event.target?.result as string;
-            parseCSV(text);
+            const data = event.target?.result;
+            const workbook = XLSX.read(data, { type: 'binary' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            
+            // Convert to array of arrays for precise row-by-row control
+            const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            parseXLSX(rows);
         };
-        reader.readAsText(file);
+        reader.readAsBinaryString(file);
     };
 
-    const parseCSV = (text: string) => {
-        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-        if (lines.length < 2) {
-            setBulkErrors(['CSV file is empty or missing data rows.']);
+    const parseXLSX = (rows: any[][]) => {
+        if (rows.length < 2) {
+            setBulkErrors(['Excel file is empty or missing data rows.']);
             return;
         }
 
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-
-        // Match user's requested fields: usn name batch section year number email
-        const usnIdx = headers.indexOf('usn');
-        const nameIdx = headers.indexOf('name');
-        const batchIdx = headers.indexOf('batch');
-        const sectionIdx = headers.indexOf('section');
-        const yearIdx = headers.indexOf('year');
+        const rawHeaders = rows[0].map(h => String(h || '').trim().toLowerCase());
+        
+        // Match headers with aliases
+        const findIdx = (terms: string[]) => rawHeaders.findIndex(h => terms.some(t => h === t || h.includes(t)));
+        const usnIdx = findIdx(['usn', 'id', 'roll', 'reg', 'number']);
+        const nameIdx = findIdx(['name', 'student', 'full name', 'candidate']);
+        const sectionIdx = findIdx(['section', 'class', 'academic', 'dept', 'branch', 'sec']);
+        const batchIdx = findIdx(['batch', 'period', 'session', 'duration']);
+        const yearIdx = findIdx(['year', 'sem', 'level']);
 
         if (usnIdx === -1 || nameIdx === -1 || sectionIdx === -1) {
             const missing = [];
-            if (usnIdx === -1) missing.push('usn');
-            if (nameIdx === -1) missing.push('name');
-            if (sectionIdx === -1) missing.push('section');
-            setBulkErrors([`Invalid CSV headers. Missing: ${missing.join(', ')}. Required at minimum: usn, name, section`]);
+            if (usnIdx === -1) missing.push('USN');
+            if (nameIdx === -1) missing.push('Name');
+            if (sectionIdx === -1) missing.push('Section');
+            setBulkErrors([`Could not find columns for: ${missing.join(', ')}. Please ensure your Excel headers are clear.`]);
             return;
         }
 
@@ -132,64 +139,93 @@ export default function StudentsPage() {
         const errors: string[] = [];
         const availableSections = sections.map(s => s.name);
 
-        lines.slice(1).forEach((line, i) => {
-            const cols = line.split(',').map(c => c.trim());
-            const usn = cols[usnIdx];
-            const name = cols[nameIdx];
-            const batch = batchIdx !== -1 ? cols[batchIdx] : '';
-            const sectionValue = cols[sectionIdx];
-            const year = yearIdx !== -1 ? cols[yearIdx] : '';
+        // Data Stitching Buffer
+        let bufferedName = '';
+        let bufferedBatch = '';
+        let bufferedYear = '';
 
-            if (!usn || !name || !sectionValue) {
-                errors.push(`Row ${i + 2}: Missing required fields (USN, Name, or Section).`);
+        rows.slice(1).forEach((cols, i) => {
+            // Clean the data
+            const val = (idx: number) => idx !== -1 ? String(cols[idx] || '').trim() : '';
+            
+            const usn = val(usnIdx);
+            const name = val(nameIdx);
+            const sectionValue = val(sectionIdx);
+            const batch = val(batchIdx);
+            const year = val(yearIdx);
+
+            // Skip entirely empty rows
+            if (!usn && !name && !sectionValue) return;
+
+            // Scenario: Partial row (Name only) - save to buffer for next row
+            if (name && !usn && !sectionValue) {
+                bufferedName = name;
+                bufferedBatch = batch;
+                bufferedYear = year;
+                return;
+            }
+
+            // Scenario: Data present - try to merge with buffer if USN is here
+            const finalName = name || bufferedName;
+            const finalBatch = batch || bufferedBatch;
+            const finalYear = year || bufferedYear;
+
+            // Clear buffer after attempt
+            bufferedName = '';
+            bufferedBatch = '';
+            bufferedYear = '';
+
+            if (!usn || !sectionValue || !finalName) {
+                errors.push(`Row ${i + 2}: Missing critical fields (Name, USN, or Section).`);
+                return;
+            }
+
+            // Advanced Fuzzy Matching for Sections
+            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const searchNorm = normalize(sectionValue);
+
+            let matchedSection = sections.find(s => 
+                normalize(s.name) === searchNorm || 
+                s.name.toLowerCase().includes(sectionValue.toLowerCase())
+            );
+
+            if (!matchedSection) {
+                // Prefix match if unique
+                const matches = sections.filter(s => normalize(s.name).startsWith(searchNorm));
+                if (matches.length === 1) matchedSection = matches[0];
+            }
+
+            if (!matchedSection) {
+                errors.push(`Row ${i + 2}: Section "${sectionValue}" not found. Available: ${availableSections.slice(0, 5).join(', ')}...`);
             } else {
-                // Fuzzy/Prefix Matching Logic
-                const normalizedSearch = sectionValue.toLowerCase();
-
-                // 1. Exact match
-                let matchedSection = sections.find(s => s.name.toLowerCase() === normalizedSearch);
-
-                // 2. Prefix match (if unique)
-                if (!matchedSection) {
-                    const matches = sections.filter(s => s.name.toLowerCase().startsWith(normalizedSearch));
-                    if (matches.length === 1) {
-                        matchedSection = matches[0];
-                    } else if (matches.length > 1) {
-                        errors.push(`Row ${i + 2}: Section "${sectionValue}" is ambiguous. Did you mean: ${matches.map(m => m.name).join(', ')}?`);
-                        return;
-                    }
-                }
-
-                if (!matchedSection) {
-                    errors.push(`Row ${i + 2}: Section "${sectionValue}" not found. Available: ${availableSections.join(', ')}`);
-                } else {
-                    parsed.push({
-                        usn: usn.toUpperCase(),
-                        name,
-                        batch,
-                        sectionName: matchedSection.name, // Use the actual DB name
-                        year
-                    });
-                }
+                parsed.push({
+                    usn: usn.toUpperCase(),
+                    name: finalName,
+                    batch: finalBatch,
+                    sectionName: matchedSection.name,
+                    year: finalYear
+                });
             }
         });
 
-        console.log('Parsed Bulk Data:', parsed);
+        console.log('Processed XLSX Data:', parsed);
         setBulkData(parsed);
         setBulkErrors(errors);
         setBulkPhase('preview');
     };
 
     const downloadSample = () => {
-        // Headers: usn,name,section,batch,year
-        const csvContent = "data:text/csv;charset=utf-8,usn,name,section,batch,year\n1NH22MC001,Venk,MCA A,2024-2026,1\n1NH22MC002,Tejas,MCA A,2024-2026,1";
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "student_bulk_template.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const data = [
+            ["USN", "Name", "Section", "Batch", "Year"],
+            ["1NH22MC001", "Venkatesh K", "MCA A 2024 2026", "2024-2026", "1"],
+            ["1NH22MC002", "Tejas Gowda", "MCA A 2024 2026", "2024-2026", "1"],
+            ["", "GANDAVARAPU CHANDRA", "", "", ""], // Example of a split row
+            ["1NH22MC003", "", "MCA A 2024 2026", "2024-2026", "1"] // Example of a split row complement
+        ];
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+        XLSX.writeFile(workbook, "student_enrollment_template.xlsx");
     };
 
     const handleDelete = async (id: string, name?: string) => {
@@ -465,7 +501,7 @@ export default function StudentsPage() {
                             {bulkPhase === 'upload' && (
                                 <div className="space-y-8">
                                     <div className="border-4 border-dashed border-slate-100 rounded-[2.5rem] p-16 text-center hover:border-indigo-100 transition-colors group relative">
-                                        <input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                        <input type="file" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                                         <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-50">
                                             <FileUp size={40} />
                                         </div>

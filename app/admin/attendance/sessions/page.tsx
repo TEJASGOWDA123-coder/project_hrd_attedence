@@ -187,7 +187,7 @@ export default function AdminAttendanceSessionsPage() {
                                     </td>
                                     <td className="px-8 py-6 text-right">
                                         <Link
-                                            href={`/admin/attendance/sessions/${s.timetableId}?date=${s.date}`}
+                                            href={`/admin/attendance/sessions/${s.timetableId || 'null'}?date=${s.date}&sectionId=${s.sectionId}&subject=${encodeURIComponent(s.subject)}&teacherId=${s.teacherId}`}
                                             className="inline-flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:text-indigo-700 transition-colors group/link"
                                         >
                                             Review Ledger

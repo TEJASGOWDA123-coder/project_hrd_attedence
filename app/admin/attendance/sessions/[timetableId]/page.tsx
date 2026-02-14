@@ -9,36 +9,72 @@ export default async function AdminAttendanceEditPage({
     searchParams
 }: {
     params: Promise<{ timetableId: string }>,
-    searchParams: Promise<{ date: string }>
+    searchParams: Promise<{ 
+        date: string;
+        sectionId?: string;
+        subject?: string;
+        teacherId?: string;
+    }>
 }) {
     const { timetableId } = await params;
-    const { date } = await searchParams;
+    const { date, sectionId: fallbackSectionId, subject: fallbackSubject, teacherId: fallbackTeacherId } = await searchParams;
 
     if (!date) return <div className="p-8 text-rose-500 font-bold">Error: Date parameter is required.</div>;
 
     // Fetch session details
-    const sessionInfo = await db.select({
-        subject: timetable.subject,
-        sectionId: timetable.sectionId,
-        sectionName: sections.name,
-        teacherName: users.name,
-        teacherId: teachers.id
-    })
-    .from(timetable)
-    .where(eq(timetable.id, timetableId))
-    .leftJoin(sections, eq(timetable.sectionId, sections.id))
-    .leftJoin(teachers, eq(timetable.teacherId, teachers.id))
-    .leftJoin(users, eq(teachers.userId, users.id))
-    .then(res => res[0]);
+    let sessionInfo = null;
+    
+    if (timetableId !== 'null') {
+        sessionInfo = await db.select({
+            subject: timetable.subject,
+            sectionId: timetable.sectionId,
+            sectionName: sections.name,
+            teacherName: users.name,
+            teacherId: teachers.id
+        })
+        .from(timetable)
+        .where(eq(timetable.id, timetableId))
+        .leftJoin(sections, eq(timetable.sectionId, sections.id))
+        .leftJoin(teachers, eq(timetable.teacherId, teachers.id))
+        .leftJoin(users, eq(teachers.userId, users.id))
+        .then(res => res[0]);
+    }
 
-    if (!sessionInfo) return <div className="p-8 text-rose-500 font-bold">Error: Session not found.</div>;
+    // Fallback if timetable record not found or timetableId is 'null'
+    if (!sessionInfo && (fallbackSectionId || fallbackSubject)) {
+        sessionInfo = await db.select({
+            subject: attendance.subject,
+            sectionId: attendance.sectionId,
+            sectionName: sections.name,
+            teacherName: users.name,
+            teacherId: teachers.id
+        })
+        .from(attendance)
+        .leftJoin(sections, eq(attendance.sectionId, sections.id))
+        .leftJoin(teachers, eq(attendance.teacherId, teachers.id))
+        .leftJoin(users, eq(teachers.userId, users.id))
+        .where(and(
+            eq(attendance.date, date),
+            fallbackSectionId ? eq(attendance.sectionId, fallbackSectionId) : undefined,
+            fallbackSubject ? eq(attendance.subject, fallbackSubject) : undefined,
+            fallbackTeacherId ? eq(attendance.teacherId, fallbackTeacherId) : undefined
+        ))
+        .limit(1)
+        .then(res => res[0]);
+    }
+
+    if (!sessionInfo) return <div className="p-8 text-rose-500 font-bold">Error: Session not found. Correct data identifiers missing.</div>;
 
     // Fetch existing records for this session
     const existingRecords = await db.query.attendance.findMany({
-        where: and(
-            eq(attendance.timetableId, timetableId),
-            eq(attendance.date, date)
-        )
+        where: timetableId !== 'null' 
+            ? and(eq(attendance.timetableId, timetableId), eq(attendance.date, date))
+            : and(
+                eq(attendance.date, date),
+                eq(attendance.sectionId, sessionInfo.sectionId as string),
+                eq(attendance.subject, sessionInfo.subject as string),
+                eq(attendance.teacherId, sessionInfo.teacherId as string)
+              )
     });
 
     const initialAttendanceMap = existingRecords.reduce((acc, rec) => ({

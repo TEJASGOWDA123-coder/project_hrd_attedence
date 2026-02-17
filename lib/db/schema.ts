@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, unique } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const users = sqliteTable('users', {
@@ -55,7 +55,9 @@ export const attendance = sqliteTable('attendance', {
   isDraft: integer('is_draft', { mode: 'boolean' }).default(false),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => ({
+  unq: unique().on(table.studentId, table.date, table.timetableId),
+}));
 
 export const subjectStats = sqliteTable('subject_stats', {
   id: text('id').primaryKey(),

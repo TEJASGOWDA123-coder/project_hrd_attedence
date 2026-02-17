@@ -1,9 +1,9 @@
 import { db } from '@/lib/db';
-import { attendance, teachers, students, subjectStats } from '@/lib/db/schema';
+import { attendance, teachers, students, subjectStats, users } from '@/lib/db/schema';
 import { eq, sql, and } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { calculateAttendancePercentage } from '@/lib/attendance-utils';
+import { recalculateStudentStats } from '@/lib/attendance-utils';
 
 export async function POST(request: Request) {
     const session = await getSession();
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     try {
         for (const [studentId, status] of Object.entries(records)) {
             // 1. Check if record already exists for this student/date/timetable
+            // We force timetableId if available to avoid overlapping session bugs
             const existing = await db.query.attendance.findFirst({
                 where: and(
                     eq(attendance.studentId, studentId),
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
                 // Update existing record
                 await db.update(attendance)
                     .set({
-                        teacherId: teacher.id, // Ensure current teacher is attributed
+                        teacherId: teacher.id,
                         status: status as any,
                         isDraft: isDraft || false,
                         updatedAt: sql`CURRENT_TIMESTAMP`
@@ -59,85 +60,35 @@ export async function POST(request: Request) {
 
             // ONLY update stats if it's NOT a draft
             if (!isDraft) {
-                // 2. Fetch all-time stats for this student and this specific subject
-                const stats = await db.select({
-                    status: attendance.status,
-                    count: sql<number>`count(*)`
-                })
-                    .from(attendance)
-                    .where(and(
-                        eq(attendance.studentId, studentId),
-                        eq(attendance.subject, subject),
-                        eq(attendance.isDraft, false) // Only count finalized records
-                    ))
-                    .groupBy(attendance.status);
-
-                let present = 0, late = 0, absent = 0;
-                stats.forEach(s => {
-                    if (s.status === 'present') present = s.count;
-                    if (s.status === 'late') late = s.count;
-                    if (s.status === 'absent') absent = s.count;
-                });
-
-                const newPercentage = calculateAttendancePercentage(present, late, absent);
-
-                // 3. Update subject-specific persistent stats
-                const existingStat = await db.query.subjectStats.findFirst({
-                    where: and(
-                        eq(subjectStats.studentId, studentId),
-                        eq(subjectStats.subject, subject)
-                    )
-                });
-
-                if (existingStat) {
-                    await db.update(subjectStats)
-                        .set({
-                            presentCount: present,
-                            lateCount: late,
-                            absentCount: absent,
-                            totalSessions: present + late + absent,
-                            percentage: newPercentage,
-                            updatedAt: sql`CURRENT_TIMESTAMP`
-                        })
-                        .where(eq(subjectStats.id, existingStat.id));
-                } else {
-                    await db.insert(subjectStats).values({
-                        id: Math.random().toString(36).substring(2, 11),
-                        studentId,
-                        subject,
-                        presentCount: present,
-                        lateCount: late,
-                        absentCount: absent,
-                        totalSessions: present + late + absent,
-                        percentage: newPercentage,
-                    });
-                }
-
-                // 4. Update the global student percentage
-                const globalStats = await db.select({
-                    status: attendance.status,
-                    count: sql<number>`count(*)`
-                })
-                    .from(attendance)
-                    .where(and(
-                        eq(attendance.studentId, studentId),
-                        eq(attendance.isDraft, false)
-                    ))
-                    .groupBy(attendance.status);
-
-                let gPresent = 0, gLate = 0, gAbsent = 0;
-                globalStats.forEach(s => {
-                    if (s.status === 'present') gPresent = s.count;
-                    if (s.status === 'late') gLate = s.count;
-                    if (s.status === 'absent') gAbsent = s.count;
-                });
-
-                const globalPercentage = calculateAttendancePercentage(gPresent, gLate, gAbsent);
-                await db.update(students)
-                    .set({ attendancePercentage: globalPercentage })
-                    .where(eq(students.id, studentId));
+                await recalculateStudentStats(studentId, subject);
             }
         }
+
+        // Send email if it's a draft
+        if (isDraft) {
+            try {
+                const { sendEmail } = await import('@/lib/email');
+                const teacherUser = await db.query.users.findFirst({
+                    where: eq(users.id, teacher.userId)
+                });
+                
+                if (teacherUser && teacherUser.email) {
+                    await sendEmail({
+                        to: teacherUser.email,
+                        subject: 'Your attendance is saved',
+                        text: `Hello ${teacherUser.name}, your attendance for ${subject} (Section ${sectionId}) has been saved as a draft. It will be automatically finalized when the session ends.`,
+                        html: `
+                            <p>Hello <b>${teacherUser.name}</b>,</p>
+                            <p>Your attendance for <b>${subject}</b> (Section <b>${sectionId}</b>) has been successfully <b>saved as a draft</b>.</p>
+                            <p>It will be automatically finalized when the session ends according to the timetable.</p>
+                        `
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Error sending save notification:', emailErr);
+            }
+        }
+
         return NextResponse.json({ success: true });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 400 });

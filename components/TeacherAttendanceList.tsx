@@ -12,12 +12,12 @@ interface ClassData {
     subject: string | null;
     time?: string;
     endTime?: string;
-    status: 'completed' | 'pending';
+    status: 'completed' | 'pending' | 'draft';
 }
 
 export default function TeacherAttendanceList({ assignedClasses }: { assignedClasses: ClassData[] }) {
     const [search, setSearch] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'draft'>('all');
 
     const filteredClasses = assignedClasses.filter(cls => {
         const matchesSearch = 
@@ -45,7 +45,7 @@ export default function TeacherAttendanceList({ assignedClasses }: { assignedCla
                     />
                 </div>
                 <div className="flex bg-slate-100 p-1 rounded-2xl w-full md:w-auto">
-                    {(['all', 'pending', 'completed'] as const).map((tab) => (
+                    {(['all', 'pending', 'draft', 'completed'] as const).map((tab) => (
                          <button
                             key={tab}
                             onClick={() => setFilterStatus(tab)}
@@ -72,6 +72,7 @@ export default function TeacherAttendanceList({ assignedClasses }: { assignedCla
                     </div>
                 ) : filteredClasses.map((cls, idx) => {
                     const isCompleted = cls.status === 'completed';
+                    const isDraft = cls.status === 'draft';
 
                     return (
                         <div key={`${cls.sectionId}-${cls.subject}-${idx}`} className="group relative animate-in fade-in zoom-in-95 duration-500">
@@ -79,12 +80,16 @@ export default function TeacherAttendanceList({ assignedClasses }: { assignedCla
                                 "bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm transition-all",
                                 isCompleted 
                                     ? "border-emerald-200 bg-emerald-50/30 opacity-80" 
-                                    : "border-slate-200 hover:shadow-2xl hover:shadow-purple-100 hover:-translate-y-1"
+                                    : isDraft
+                                        ? "border-amber-200 bg-amber-50/20"
+                                        : "border-slate-200 hover:shadow-2xl hover:shadow-purple-100 hover:-translate-y-1"
                             )}>
                                 <div className="flex justify-between items-start mb-8">
                                     <div className={cn(
                                         "p-4 rounded-2xl transition-colors duration-300",
-                                        isCompleted ? "bg-emerald-100 text-emerald-600" : "bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white"
+                                        isCompleted ? "bg-emerald-100 text-emerald-600" : 
+                                        isDraft ? "bg-amber-100 text-amber-600" :
+                                        "bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white"
                                     )}>
                                         {isCompleted ? <CheckCircle2 size={24} /> : <Landmark size={24} />}
                                     </div>
@@ -99,23 +104,32 @@ export default function TeacherAttendanceList({ assignedClasses }: { assignedCla
                                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{cls.sectionName || 'Unknown Section'}</h3>
                                 </div>
                                 <p className="text-sm text-slate-400 font-medium mb-8">
-                                    {isCompleted ? "Attendance already recorded for today." : "Ready for today's roll call session."}
+                                    {isCompleted ? "Attendance already recorded for today." : 
+                                     isDraft ? "Attendance is in draft - click to finalize." :
+                                     "Ready for today's roll call session."}
                                 </p>
 
                                 <Link
-                                    href={`/teacher/attendance/${cls.sectionId}?subject=${encodeURIComponent(cls.subject || '')}&timetableId=${cls.timetableId}&endTime=${cls.endTime?.split(' - ')[1] || ''}`}
+                                    href={`/teacher/attendance/${cls.sectionId}?subject=${encodeURIComponent(cls.subject || '')}&timetableId=${cls.timetableId}&endTime=${cls.endTime || ''}`}
                                     className={cn(
                                         "flex items-center justify-between w-full p-5 rounded-2xl transition-all",
-                                        cls.status === 'completed'
+                                        isCompleted
                                             ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                                            : "bg-slate-900 text-white hover:bg-purple-600 group-hover:shadow-xl group-hover:shadow-purple-200"
+                                            : isDraft
+                                                ? "bg-amber-500 text-white hover:bg-amber-600"
+                                                : "bg-slate-900 text-white hover:bg-purple-600 group-hover:shadow-xl group-hover:shadow-purple-200"
                                     )}
                                 >
                                     <span className="flex items-center gap-3 font-bold text-sm">
-                                        {cls.status === 'completed' ? (
+                                        {isCompleted ? (
                                             <>
                                                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                                                 Session Recorded - Edit Now
+                                            </>
+                                        ) : isDraft ? (
+                                            <>
+                                                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                                Attendance in Draft - Finalize
                                             </>
                                         ) : (
                                             <>

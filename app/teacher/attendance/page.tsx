@@ -40,22 +40,32 @@ export default async function TeacherAttendanceSelection() {
 
     const todayAttendance = await db.select({
         timetableId: attendance.timetableId,
+        isDraft: attendance.isDraft,
     })
     .from(attendance)
     .where(and(
         eq(attendance.teacherId, teacher.id),
         eq(attendance.date, todayStr)
-    ));
+    ))
+    .groupBy(attendance.timetableId, attendance.isDraft);
 
-    const dataList = todaysClasses.map(cls => ({
-        timetableId: cls.timetableId,
-        sectionId: cls.sectionId as string,
-        sectionName: cls.sectionName,
-        subject: cls.subject as string,
-        time: `${cls.startTime} - ${cls.endTime}`,
-        endTime: cls.endTime as string,
-        status: todayAttendance.some(a => a.timetableId === cls.timetableId) ? 'completed' as const : 'pending' as const
-    }));
+    const dataList = todaysClasses.map(cls => {
+        const attRecord = todayAttendance.find(a => a.timetableId === cls.timetableId);
+        let status: 'completed' | 'pending' | 'draft' = 'pending';
+        if (attRecord) {
+            status = attRecord.isDraft ? 'draft' : 'completed';
+        }
+
+        return {
+            timetableId: cls.timetableId,
+            sectionId: cls.sectionId as string,
+            sectionName: cls.sectionName,
+            subject: cls.subject as string,
+            time: `${cls.startTime} - ${cls.endTime}`,
+            endTime: cls.endTime as string,
+            status
+        };
+    });
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">

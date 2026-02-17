@@ -67,7 +67,53 @@ export default function AttendanceForm({
         }
     };
 
-    // Auto-Submit Logic
+    const [timeLeft, setTimeLeft] = useState<string | null>(null);
+    const [isEndingSoon, setIsEndingSoon] = useState(false);
+
+    // Live Countdown Timer Logic
+    useEffect(() => {
+        if (!endTime) return;
+
+        const [endH, endM] = endTime.split(':').map(Number);
+        
+        const updateTimer = () => {
+            const now = new Date();
+            const target = new Date();
+            target.setHours(endH, endM, 0, 0);
+
+            const diff = target.getTime() - now.getTime();
+            
+            if (diff <= 0) {
+                setTimeLeft('00:00');
+                setIsEndingSoon(true);
+                return;
+            }
+
+            const minutes = Math.floor(diff / 1000 / 60);
+            const seconds = Math.floor((diff / 1000) % 60);
+            
+            setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+            
+            // Highlight when less than 5 minutes left
+            if (minutes < 5) {
+                setIsEndingSoon(true);
+            } else {
+                setIsEndingSoon(false);
+            }
+
+            // Client-side auto-submit fail-safe (exact end time)
+            if (minutes === 0 && seconds === 0) {
+                 handleSubmit(false);
+            }
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+
+        return () => clearInterval(interval);
+    }, [endTime]);
+
+    // Cleanup redundant effect but keep consistency with requested features
     useEffect(() => {
         if (!endTime) return;
 
@@ -79,13 +125,11 @@ export default function AttendanceForm({
 
             const diffMinutes = (endTimeDate.getTime() - now.getTime()) / 1000 / 60;
 
-            // Auto-submit 5 minutes before ending
-            if (diffMinutes > 0 && diffMinutes <= 5) {
-                console.log('Auto-submitting attendance...');
-                handleSubmit(false);
-                clearInterval(timer);
+            // Auto-submit 5 minutes before ending (now shifted to cron, kept for UI reactivity)
+            if (diffMinutes > 0 && diffMinutes <= 0.1) { // Wait for exact end to avoid race with cron
+                // handleSubmit(false); // Let cron handle it for consistency
             }
-        }, 60000); // Check every minute
+        }, 60000);
 
         return () => clearInterval(timer);
     }, [endTime, attendance]);
@@ -106,8 +150,21 @@ export default function AttendanceForm({
                                 Topic: <span className="text-indigo-600">{subject}</span>
                             </p>
                         </div>
-                        <div className="px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Total Roster: {students.length}
+                        <div className="flex flex-col items-end gap-2">
+                             <div className="px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                Total Roster: {students.length}
+                            </div>
+                            {timeLeft && (
+                                <div className={cn(
+                                    "flex items-center gap-2 px-4 py-2 rounded-xl border font-black text-[10px] uppercase tracking-widest animate-in slide-in-from-right duration-500",
+                                    isEndingSoon 
+                                        ? "bg-rose-50 border-rose-100 text-rose-600 shadow-lg shadow-rose-100" 
+                                        : "bg-indigo-50 border-indigo-100 text-indigo-600"
+                                )}>
+                                    <Clock size={12} className={cn(isEndingSoon && "animate-spin")} />
+                                    Time Left: {timeLeft}
+                                </div>
+                            )}
                         </div>
                     </div>
                 
@@ -217,8 +274,15 @@ export default function AttendanceForm({
                         Save Progress
                     </button>
                     <div className="flex items-center gap-4 text-slate-400 ml-4 hidden lg:flex">
-                        <ShieldAlert size={20} />
-                        <p className="text-xs font-bold uppercase tracking-widest leading-none">Auto-finalizes {endTime ? `at ${endTime}` : 'at session end'}</p>
+                        <ShieldAlert size={20} className={cn(isEndingSoon ? "text-rose-500" : "text-slate-400")} />
+                        <p className={cn(
+                            "text-xs font-bold uppercase tracking-widest leading-none",
+                            isEndingSoon ? "text-rose-600" : "text-slate-400"
+                        )}>
+                            {isEndingSoon 
+                                ? "Submitting soon... check for reminder email" 
+                                : `Auto-finalizes ${endTime ? `at ${endTime}` : 'at session end'}`}
+                        </p>
                     </div>
                 </div>
                 <button
